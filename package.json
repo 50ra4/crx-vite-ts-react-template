@@ -4,6 +4,8 @@
   "description": "Chrome extension template using Vite, TypeScript and React",
   "main": "index.js",
   "scripts": {
+    "build": "echo \"no build npm scripts\" && exit 0",
+    "check-type": "tsc --noEmit",
     "test": "jest -c ./jest.config.ts"
   },
   "repository": {
