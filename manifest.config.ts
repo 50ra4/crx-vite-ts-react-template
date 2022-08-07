@@ -30,7 +30,12 @@ export default defineManifest(({ command, mode, ...manifest }) => ({
   devtools_page: 'devTools.html',
   author,
   permissions: [],
-  content_scripts: [],
+  content_scripts: [
+    {
+      matches: ['https://example.com/*'],
+      js: ['src/content_scripts/sample.tsx'],
+    },
+  ],
   background: {
     service_worker: 'src/background.ts',
   },
