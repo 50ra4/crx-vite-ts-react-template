@@ -13,7 +13,8 @@
     "lint:eslint": "eslint --fix '{src,tools}/**/*.{js,ts,tsx}'",
     "lint": "npm run lint:prettier && npm run lint:eslint",
     "check-type": "tsc --noEmit",
-    "test": "jest -c ./jest.config.ts"
+    "test": "jest -c ./jest.config.ts",
+    "docs": "rm -rf docs && cp -r tools/gh-pages docs && npm run zip && mv extension.zip docs"
   },
   "repository": {
     "type": "git",
