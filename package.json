@@ -4,6 +4,7 @@
   "description": "Chrome extension template using Vite, TypeScript and React",
   "main": "index.js",
   "scripts": {
+    "prepare": "husky install",
     "build": "echo \"no build npm scripts\" && exit 0",
     "lint:prettier": "prettier --write '{src,tools}/**/*.{js,ts,tsx}'",
     "lint:eslint": "eslint --fix '{src,tools}/**/*.{js,ts,tsx}'",
