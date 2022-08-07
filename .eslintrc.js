@@ -28,12 +28,14 @@ module.exports = {
     'import/resolver': {
       node: {
         extensions: ['.ts', '.tsx'],
+        paths: ['./src'],
       },
     },
   },
   plugins: ['react', '@typescript-eslint'],
   ignorePatterns: ['.eslintrc.js', '*.config.ts'],
   rules: {
+    'import/no-unresolved': 'off',
     'sort-imports': 'off',
     'import/order': ['error', { alphabetize: { order: 'asc' } }],
   },
