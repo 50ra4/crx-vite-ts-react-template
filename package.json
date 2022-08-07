@@ -1,0 +1,19 @@
+{
+  "name": "crx-vite-ts-react-template",
+  "version": "1.0.0",
+  "description": "Chrome extension template using Vite, TypeScript and React",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/50ra4/crx-vite-ts-react-template.git"
+  },
+  "author": "50ra4",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/50ra4/crx-vite-ts-react-template/issues"
+  },
+  "homepage": "https://github.com/50ra4/crx-vite-ts-react-template#readme"
+}
