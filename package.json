@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "prepare": "husky install",
+    "dev": "vite",
     "build": "echo \"no build npm scripts\" && exit 0",
     "lint:prettier": "prettier --write '{src,tools}/**/*.{js,ts,tsx}'",
     "lint:eslint": "eslint --fix '{src,tools}/**/*.{js,ts,tsx}'",
