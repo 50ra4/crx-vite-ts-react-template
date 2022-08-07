@@ -1,17 +1,33 @@
-import React, { StrictMode } from 'react';
+import React, { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const Root = () => {
+  const [response, setResponse] = useState('');
+
+  const onClick = () => {
+    chrome.runtime.sendMessage('send message from popup', (res) => {
+      console.log(res);
+      setResponse(res?.message);
+    });
+  };
+
   return (
     <div
       style={{
-        color: 'red',
-        fontSize: '24px',
         width: '320px',
         height: '320px',
       }}
     >
-      popup
+      <h2
+        style={{
+          color: 'red',
+          fontSize: '24px',
+        }}
+      >
+        popup
+      </h2>
+      <button onClick={onClick}>send message</button>
+      {response && <p>{response}</p>}
     </div>
   );
 };
