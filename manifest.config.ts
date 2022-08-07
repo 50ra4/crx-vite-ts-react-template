@@ -31,4 +31,7 @@ export default defineManifest(({ command, mode, ...manifest }) => ({
   author,
   permissions: [],
   content_scripts: [],
+  background: {
+    service_worker: 'src/background.ts',
+  },
 }));
