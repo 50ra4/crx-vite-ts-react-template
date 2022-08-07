@@ -5,6 +5,7 @@ module.exports = {
   },
   extends: [
     'eslint:recommended',
+    'plugin:import/errors',
     'plugin:react/recommended',
     'plugin:react-hooks/recommended',
     'plugin:@typescript-eslint/recommended',
@@ -24,8 +25,16 @@ module.exports = {
     react: {
       version: 'detect',
     },
+    'import/resolver': {
+      node: {
+        extensions: ['.ts', '.tsx'],
+      },
+    },
   },
   plugins: ['react', '@typescript-eslint'],
   ignorePatterns: ['.eslintrc.js', '*.config.ts'],
-  rules: {},
+  rules: {
+    'sort-imports': 'off',
+    'import/order': ['error', { alphabetize: { order: 'asc' } }],
+  },
 };
