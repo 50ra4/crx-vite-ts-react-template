@@ -29,7 +29,7 @@ export default defineManifest(({ command, mode, ...manifest }) => ({
   },
   devtools_page: 'devTools.html',
   author,
-  permissions: [],
+  permissions: ['background'],
   content_scripts: [
     {
       matches: ['https://example.com/*'],
