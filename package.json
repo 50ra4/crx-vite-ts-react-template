@@ -14,7 +14,7 @@
     "lint": "npm run lint:prettier && npm run lint:eslint",
     "check-type": "tsc --noEmit",
     "test": "jest -c ./jest.config.ts",
-    "docs": "rm -rf docs && cp -r tools/gh-pages docs && npm run zip && mv extension.zip docs"
+    "docs": "rm -rf docs && cp -r gh-pages docs && npm run zip && mv extension.zip docs"
   },
   "repository": {
     "type": "git",
