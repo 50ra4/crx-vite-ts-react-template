@@ -80,3 +80,14 @@ github actions を用いた CI/CD を追加しています。
 CI は、type error、build、test のチェックを行なっています。
 CD は、前述の`npm run docs`を用いて、作成した Chrome 拡張機能を github pages に公開します。
 （github pages に公開するには別途 github repository の設定が必要です）
+
+## AI開発設定 (Claude Code / Codex)
+
+コーディングエージェント向けの基本設定を用意しています。
+
+- `AGENTS.md` : 共通エントリポイント(常時ロードされる正本)
+- `CLAUDE.md` : Claude Code 用(`AGENTS.md` を import するのみ)
+- `.claude/rules/` : 対象ファイル編集時に読み込む技術規約
+- `.claude/skills/` : タスク該当時にオンデマンドで読み込む手順書
+
+トークン消費を抑えるため、常時ロードは `AGENTS.md` のみとし、詳細は必要時に読み込む構成としています。
