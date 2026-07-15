@@ -23,7 +23,7 @@ Root-level HTML files load `src/<name>.tsx`; the manifest is generated from
 
 ## Conventions
 
-- Named exports only, no default exports.
+- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `jest.config.ts`), which must keep `export default` because Vite/CRXJS/ts-jest require it to load the config.
 - Components are arrow functions.
 - Tests are colocated as `*.test.ts(x)` next to the source file.
 - Hooks return tuples `as const` (state, action).
