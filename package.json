@@ -25,7 +25,7 @@
   "author": "50ra4",
   "license": "MIT",
   "engines": {
-    "node": "^22.13.0 || >=24.0.0"
+    "node": ">=24.0.0"
   },
   "bugs": {
     "url": "https://github.com/50ra4/crx-vite-ts-react-template/issues"
@@ -47,7 +47,7 @@
     "@vitejs/plugin-react": "6.0.3",
     "husky": "9.1.7",
     "jsdom": "29.1.1",
-    "lint-staged": "16.4.0",
+    "lint-staged": "17.0.8",
     "oxlint": "1.74.0",
     "prettier": "3.9.5",
     "typescript": "7.0.2",
