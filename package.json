@@ -23,7 +23,7 @@
   "author": "50ra4",
   "license": "MIT",
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.13.0 || >=24.0.0"
   },
   "bugs": {
     "url": "https://github.com/50ra4/crx-vite-ts-react-template/issues"
