@@ -10,7 +10,7 @@ Conventions ESLint/Prettier/tsc cannot enforce:
 - Entry mount boilerplate (see `src/popup.tsx`):
 
   ```tsx
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  // oxlint-disable-next-line typescript/no-non-null-assertion
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <Root />
