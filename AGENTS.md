@@ -19,7 +19,7 @@ Root-level HTML files load `src/<name>.tsx`; the manifest is generated from
 | `npm run zip` | build + `extension.zip` | |
 | `npm run docs` | rebuild `docs/` from `gh-pages/` + zip | used by GitHub Pages deploy |
 
-`.nvmrc` pins Node 24, matching the `engines.node` (`>=22.12`) requirement.
+`.nvmrc` pins Node 24, matching the `engines.node` (`^22.13.0 || >=24.0.0`) requirement.
 
 ## Conventions
 
