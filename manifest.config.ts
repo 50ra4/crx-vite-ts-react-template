@@ -1,5 +1,5 @@
 import { defineManifest } from '@crxjs/vite-plugin';
-import { name, version, author } from './package.json';
+import { name, version } from './package.json';
 
 const EXTENSION_NAMES = {
   build: name,
@@ -10,8 +10,7 @@ const createIconFileSuffix = (command: 'build' | 'serve') =>
   command === 'serve' ? '-dev' : '';
 
 // import to `vite.config.ts`
-export default defineManifest(({ command, mode, ...manifest }) => ({
-  ...manifest,
+export default defineManifest(({ command }) => ({
   version,
   manifest_version: 3,
   name: EXTENSION_NAMES[command],
@@ -28,7 +27,6 @@ export default defineManifest(({ command, mode, ...manifest }) => ({
     page: 'options.html',
   },
   devtools_page: 'devTools.html',
-  author,
   permissions: ['background'],
   content_scripts: [
     {

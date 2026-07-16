@@ -12,21 +12,16 @@ jobs:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
-    # node version
-    strategy:
-      matrix:
-        node-version: ['16.15']
-
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      # setup node
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      # setup node (version pinned in .nvmrc)
+      - name: Use Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version-file: '.nvmrc'
 
       # install npm packages
       - name: install npm packages
