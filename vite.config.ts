@@ -5,8 +5,7 @@ import { crx } from '@crxjs/vite-plugin';
 import manifest from './manifest.config';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command, ...config }) => ({
-  ...config,
+export default defineConfig(({ command }) => ({
   build: {
     outDir: command === 'build' ? 'extension' : 'dist',
   },

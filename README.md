@@ -11,7 +11,7 @@
 npm i
 ```
 
-別途、node.js（16.15.1）が必要です。
+別途、node.js（>=22.12、推奨 24）が必要です。
 
 ## Build
 
@@ -24,13 +24,13 @@ npm run build
 
 ## Testing
 
-Jest や@testing-library を用いて、テストを実行します。
+Vitest や@testing-library を用いて、テストを実行します。
 
 ```
 npm run test
 ```
 
-開発中にテストを実行する場合、Jest の watch オプションを追加することでソースファイルが変更される度にテストを実行します。
+開発中にテストを実行する場合、Vitest の watch オプションを追加することでソースファイルが変更される度にテストを実行します。
 
 ```
 npm run test -- --watch

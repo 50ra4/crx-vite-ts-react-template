@@ -10,20 +10,20 @@ Root-level HTML files load `src/<name>.tsx`; the manifest is generated from
 
 | Command | What it does | Notes |
 | --- | --- | --- |
-| `npm ci` | Install deps | 645 packages, verified OK |
+| `npm ci` | Install deps | 407 packages, verified OK |
 | `npm run dev` | Vite dev server with HMR | via `@crxjs/vite-plugin` |
 | `npm run build` | Build to `extension/` | deletes and recreates the dir |
 | `npm run check-type` | `tsc --noEmit` | |
-| `npm test` | Run Jest | 3 sample tests, jsdom env |
+| `npm test` | Run Vitest | 3 sample tests, jsdom env |
 | `npm run lint` | prettier --write, then eslint --fix | **rewrites files on disk**; same command runs in the pre-commit hook |
 | `npm run zip` | build + `extension.zip` | |
 | `npm run docs` | rebuild `docs/` from `gh-pages/` + zip | used by GitHub Pages deploy |
 
-`.nvmrc` pins Node 16.15.1, but every command above was verified working on Node 22.
+`.nvmrc` pins Node 24, matching the `engines.node` (`>=22.12`) requirement.
 
 ## Conventions
 
-- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `jest.config.ts`), which must keep `export default` because Vite/CRXJS/ts-jest require it to load the config.
+- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `vitest.config.ts`), which must keep `export default` because Vite/CRXJS require it to load the config.
 - Components are arrow functions.
 - Tests are colocated as `*.test.ts(x)` next to the source file.
 - Hooks return tuples `as const` (state, action).
