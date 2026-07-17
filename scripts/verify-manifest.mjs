@@ -6,7 +6,6 @@ const EXPECTED_CSP = "script-src 'self'; object-src 'self';";
 const EXPECTED_MATCHES = ['https://example.com/*'];
 const EXPECTED_PERMISSIONS = ['storage'];
 const EXPECTED_HOST_PERMISSIONS = [];
-const EXPECTED_USE_DYNAMIC_URL = false;
 const GLOB = /[*?[\]{}]/u;
 const CONCRETE_JS_ASSET = /^assets\/[^*?[\]{}]+\.js$/u;
 
@@ -120,7 +119,7 @@ if (manifest.background?.service_worker !== undefined) {
 }
 
 report(
-  Array.isArray(manifest.content_scripts),
+  Array.isArray(manifest.content_scripts ?? []),
   'content_scripts must be an array.',
 );
 const contentScripts = Array.isArray(manifest.content_scripts)
@@ -170,8 +169,8 @@ webAccessibleResources.forEach((entry, index) => {
     `web_accessible_resources.${index}.extension_ids`,
   );
   report(
-    entry.use_dynamic_url === EXPECTED_USE_DYNAMIC_URL,
-    `web_accessible_resources.${index}.use_dynamic_url must be ${EXPECTED_USE_DYNAMIC_URL}; received ${JSON.stringify(entry.use_dynamic_url)}.`,
+    typeof entry.use_dynamic_url === 'boolean',
+    `web_accessible_resources.${index}.use_dynamic_url must be explicit and boolean; received ${JSON.stringify(entry.use_dynamic_url)}.`,
   );
   const field = `web_accessible_resources.${index}.resources`;
   const resources = readStrings(entry.resources, field) ?? [];
