@@ -38,6 +38,13 @@
             "name": "chrome",
             "message": "Chrome API は src/lib のラッパー経由で利用してください。"
           }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "property": "chrome",
+            "message": "Chrome API は src/lib のラッパー経由で利用してください。"
+          }
         ]
       }
     }

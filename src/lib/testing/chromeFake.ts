@@ -45,11 +45,13 @@ const getStoredValues = (
   keys?: string | string[] | Record<string, unknown> | null,
 ): Record<string, unknown> => {
   if (typeof keys === 'string') {
-    return { [keys]: store.get(keys) };
+    return store.has(keys) ? { [keys]: store.get(keys) } : {};
   }
 
   if (Array.isArray(keys)) {
-    return Object.fromEntries(keys.map((key) => [key, store.get(key)]));
+    return Object.fromEntries(
+      keys.filter((key) => store.has(key)).map((key) => [key, store.get(key)]),
+    );
   }
 
   if (keys) {
@@ -64,6 +66,28 @@ const getStoredValues = (
   return Object.fromEntries(store);
 };
 
+const getBytesInUse = (
+  store: Map<string, unknown>,
+  keys?: string | string[] | null,
+): number => {
+  const selectedKeys =
+    keys == null ? [...store.keys()] : typeof keys === 'string' ? [keys] : keys;
+  const encoder = new TextEncoder();
+
+  return selectedKeys.reduce((total, key) => {
+    if (!store.has(key)) {
+      return total;
+    }
+
+    const serializedValue = JSON.stringify(store.get(key)) ?? '';
+    return (
+      total +
+      encoder.encode(key).byteLength +
+      encoder.encode(serializedValue).byteLength
+    );
+  }, 0);
+};
+
 const createStorageArea = (
   areaName: chrome.storage.AreaName,
   emitChanges: (
@@ -74,7 +98,21 @@ const createStorageArea = (
   const store = new Map<string, unknown>();
 
   return {
+    clear: vi.fn(async () => {
+      const changes = Object.fromEntries(
+        [...store].map(([key, oldValue]) => [key, { oldValue }]),
+      );
+
+      if (store.size === 0) {
+        return;
+      }
+
+      store.clear();
+      emitChanges(changes, areaName);
+    }),
     get: vi.fn(async (keys) => getStoredValues(store, keys)),
+    getBytesInUse: vi.fn(async (keys) => getBytesInUse(store, keys)),
+    getKeys: vi.fn(async () => [...store.keys()]),
     remove: vi.fn(async (keys: string | string[]) => {
       const changes: Record<string, chrome.storage.StorageChange> = {};
 
@@ -108,6 +146,7 @@ const createStorageArea = (
         emitChanges(changes, areaName);
       }
     }),
+    setAccessLevel: vi.fn(async (_accessOptions) => undefined),
   } as unknown as chrome.storage.StorageArea;
 };
 
@@ -142,24 +181,32 @@ export const createChromeFake = (
       sendMessage: vi.fn(
         (message: unknown) =>
           new Promise<unknown>((resolve) => {
+            let channelKeptOpen = false;
+            let responded = false;
+            const sendResponse = (response: unknown) => {
+              if (responded) {
+                return;
+              }
+
+              responded = true;
+              resolve(response);
+            };
+
             for (const listener of runtimeListeners) {
-              let responded = false;
-              const sendResponse = (response: unknown) => {
-                responded = true;
-                resolve(response);
-              };
               const keepChannelOpen = listener(
                 message,
                 runtimeSender,
                 sendResponse,
               );
 
-              if (responded || keepChannelOpen === true) {
-                return;
+              if (keepChannelOpen === true) {
+                channelKeptOpen = true;
               }
             }
 
-            resolve(undefined);
+            if (!responded && !channelKeptOpen) {
+              resolve(undefined);
+            }
           }),
       ),
     },
