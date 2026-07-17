@@ -1,7 +1,7 @@
+import { useStorageValue } from '../../lib/storage';
 import React, { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { sendMessage } from '../../lib/messaging/messages';
-import { useStorageValue } from '../../lib/storage';
 
 const Root = () => {
   const [response, setResponse] = useState('');
