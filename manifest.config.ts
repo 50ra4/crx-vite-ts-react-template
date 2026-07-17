@@ -26,15 +26,14 @@ export default defineManifest(({ command }) => ({
   options_ui: {
     page: 'options.html',
   },
-  devtools_page: 'devTools.html',
   permissions: ['background'],
   content_scripts: [
     {
       matches: ['https://example.com/*'],
-      js: ['src/content_scripts/sample.tsx'],
+      js: ['src/entrypoints/content/sample.tsx'],
     },
   ],
   background: {
-    service_worker: 'src/background.ts',
+    service_worker: 'src/entrypoints/background/background.ts',
   },
 }));
