@@ -1,18 +1,66 @@
-import React, { StrictMode } from 'react';
+import React, { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { useStorageValue } from '../../lib/storage';
 
 const Root = () => {
+  const [exampleSetting, setExampleSetting] = useStorageValue('exampleSetting');
+  const [draftValue, setDraftValue] = useState(exampleSetting);
+  const [saveError, setSaveError] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+  const syncedSettingRef = useRef(exampleSetting);
+
+  useEffect(() => {
+    if (syncedSettingRef.current === exampleSetting) {
+      return;
+    }
+
+    syncedSettingRef.current = exampleSetting;
+
+    if (!isDirty) {
+      setDraftValue(exampleSetting);
+    }
+  }, [exampleSetting, isDirty]);
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaveError('');
+
+    try {
+      await setExampleSetting(draftValue);
+      syncedSettingRef.current = draftValue;
+      setIsDirty(false);
+    } catch (error: unknown) {
+      setSaveError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   return (
-    <div
+    <main
       style={{
-        color: 'red',
-        fontSize: '24px',
         width: '320px',
-        height: '320px',
+        padding: '16px',
       }}
     >
-      options
-    </div>
+      <h1>Options</h1>
+      <p>保存した値は chrome.storage.sync に保持され、popup からも読めます。</p>
+      <form onSubmit={onSubmit}>
+        <label htmlFor="example-setting">共有設定</label>
+        <input
+          id="example-setting"
+          onChange={(event) => {
+            const nextValue = event.currentTarget.value;
+            setDraftValue(nextValue);
+            setIsDirty(nextValue !== syncedSettingRef.current);
+          }}
+          type="text"
+          value={draftValue}
+        />
+        <button type="submit">保存</button>
+      </form>
+      <p>現在の保存値: {exampleSetting}</p>
+      {isDirty && <p>未保存の変更があります。</p>}
+      {saveError && <p role="alert">保存に失敗しました: {saveError}</p>}
+    </main>
   );
 };
 

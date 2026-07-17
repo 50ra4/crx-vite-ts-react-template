@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const EXPECTED_CSP = "script-src 'self'; object-src 'self';";
 const EXPECTED_MATCHES = ['https://example.com/*'];
-const EXPECTED_PERMISSIONS = [];
+const EXPECTED_PERMISSIONS = ['storage'];
 const EXPECTED_HOST_PERMISSIONS = [];
 const EXPECTED_WEB_ACCESSIBLE_RESOURCES = [
   /^assets\/jsx-runtime-[A-Za-z0-9_-]+\.js$/u,
