@@ -20,4 +20,4 @@ Conventions ESLint/Prettier/tsc cannot enforce:
 
 - Custom hooks return `[state, action] as const` (see `src/examples/hooks/useIncrement.ts`).
 - Pure utilities have explicit return types (see `src/examples/utils/calc.ts`: `(a: number, b: number): number`).
-- Name unused callback params `_` (see `background.ts`'s `onMessage` listener).
+- Name unused callback params `_` (e.g. an unused `sender` / event argument).
