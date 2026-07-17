@@ -26,7 +26,16 @@ export default defineManifest(({ command }) => ({
   options_ui: {
     page: 'options.html',
   },
-  permissions: ['background', 'storage'],
+  ...(command === 'build'
+    ? {
+        content_security_policy: {
+          extension_pages: "script-src 'self'; object-src 'self';",
+        },
+      }
+    : {}),
+  // Declare only permissions for Chrome APIs that the extension actually uses.
+  // Keep the allowlists in scripts/verify-manifest.mjs in sync when adding one.
+  permissions: ['storage'],
   content_scripts: [
     {
       matches: ['https://example.com/*'],

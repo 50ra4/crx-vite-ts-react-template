@@ -7,15 +7,16 @@
     "prepare": "husky",
     "dev": "vite",
     "build": "rm -rf extension && vite build",
+    "verify:manifest": "node scripts/verify-manifest.mjs",
     "preview": "vite preview",
     "zip": "npm run build && rm -f extension.zip && zip -r extension.zip extension",
-    "lint": "oxlint src *.config.ts",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.config.ts\"",
+    "lint": "oxlint src scripts *.config.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.config.ts\"",
     "check-type": "tsc --noEmit",
     "test": "vitest run"
   },
   "lint-staged": {
-    "*.{ts,tsx}": ["oxlint --fix", "prettier --write"]
+    "*.{mjs,ts,tsx}": ["oxlint --fix", "prettier --write"]
   },
   "repository": {
     "type": "git",
