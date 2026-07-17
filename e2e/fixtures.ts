@@ -89,7 +89,14 @@ const prepareExtension = async (): Promise<{
       );
     }
 
-    replaceContentMatches(parsedManifest.web_accessible_resources);
+    const webAccessibleResourceMatches = replaceContentMatches(
+      parsedManifest.web_accessible_resources,
+    );
+    if (webAccessibleResourceMatches === 0) {
+      throw new Error(
+        `Built extension has no web_accessible_resources matching ${PRODUCTION_CONTENT_MATCH}.`,
+      );
+    }
     await writeFile(
       manifestPath,
       `${JSON.stringify(parsedManifest, null, 2)}\n`,
@@ -114,7 +121,9 @@ const closeServer = (server: Server): Promise<void> =>
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   extensionContext: [
-    async ({ browserName: _ }, provide) => {
+    // Playwright requires the fixture dependency argument to use object destructuring.
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, provide) => {
       const { extensionPath, temporaryDirectory } = await prepareExtension();
       let context: BrowserContext | undefined;
 
@@ -155,7 +164,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   ],
 
   testPageUrl: [
-    async ({ browserName: _ }, provide) => {
+    // Playwright requires the fixture dependency argument to use object destructuring.
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, provide) => {
       const server = createServer((_request, response) => {
         response.writeHead(200, {
           Connection: 'close',

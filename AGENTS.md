@@ -27,7 +27,7 @@ README's "ディレクトリ構成" section for the full dependency-direction ru
 
 ## Conventions
 
-- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `vitest.config.ts`), which must keep `export default` because Vite/CRXJS require it to load the config.
+- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `playwright.config.ts`, `vitest.config.ts`), which must keep `export default` because Vite/CRXJS/Playwright/Vitest require it to load the config.
 - Components are arrow functions.
 - Unit tests are colocated as `*.test.ts(x)` next to the source file; Playwright smoke tests live under `e2e/` as `*.spec.ts`.
 - Hooks return tuples `as const` (state, action).
