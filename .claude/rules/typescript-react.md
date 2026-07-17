@@ -5,7 +5,7 @@ paths: ['**/*.{ts,tsx}']
 Conventions ESLint/Prettier/tsc cannot enforce:
 
 - Never use `any`; use `unknown` and narrow it.
-- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `vitest.config.ts`), which must keep `export default` because Vite/CRXJS/Vitest require it to load the config.
+- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `playwright.config.ts`, `vitest.config.ts`), which must keep `export default` because Vite/CRXJS/Playwright/Vitest require it to load the config.
 - Components are arrow functions; the top-level component in an entry file is named `Root`.
 - Entry mount boilerplate (see `src/entrypoints/popup/popup.tsx`):
 

@@ -16,5 +16,12 @@
     "jsx": "react-jsx",
     "types": ["chrome", "vitest/globals"]
   },
-  "include": ["src", "vite.config.ts", "manifest.config.ts", "vitest.config.ts"]
+  "include": [
+    "src",
+    "e2e",
+    "vite.config.ts",
+    "manifest.config.ts",
+    "playwright.config.ts",
+    "vitest.config.ts"
+  ]
 }

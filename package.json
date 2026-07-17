@@ -8,10 +8,11 @@
     "dev": "vite",
     "build": "rm -rf extension && vite build",
     "verify:manifest": "node scripts/verify-manifest.mjs",
+    "e2e": "playwright test",
     "preview": "vite preview",
     "zip": "npm run build && rm -f extension.zip && zip -r extension.zip extension",
-    "lint": "oxlint src scripts *.config.ts",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.config.ts\"",
+    "lint": "oxlint src scripts e2e *.config.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.mjs\" \"*.config.ts\"",
     "check-type": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "2.7.1",
+    "@playwright/test": "1.61.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",

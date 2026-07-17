@@ -16,6 +16,7 @@ README's "ディレクトリ構成" section for the full dependency-direction ru
 | `npm ci` | Install deps | 407 packages, verified OK |
 | `npm run dev` | Vite dev server with HMR | via `@crxjs/vite-plugin` |
 | `npm run build` | Build to `extension/` | deletes and recreates the dir |
+| `npm run e2e` | Run Playwright Chromium smoke tests | requires a prior build and installed Chromium |
 | `npm run check-type` | `tsc --noEmit` | |
 | `npm test` | Run Vitest | 3 sample tests, jsdom env |
 | `npm run lint` | `oxlint` (check-only) | no file mutation; pre-commit runs the staged-only equivalent via lint-staged |
@@ -26,9 +27,9 @@ README's "ディレクトリ構成" section for the full dependency-direction ru
 
 ## Conventions
 
-- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `vitest.config.ts`), which must keep `export default` because Vite/CRXJS require it to load the config.
+- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `playwright.config.ts`, `vitest.config.ts`), which must keep `export default` because Vite/CRXJS/Playwright/Vitest require it to load the config.
 - Components are arrow functions.
-- Tests are colocated as `*.test.ts(x)` next to the source file.
+- Unit tests are colocated as `*.test.ts(x)` next to the source file; Playwright smoke tests live under `e2e/` as `*.spec.ts`.
 - Hooks return tuples `as const` (state, action).
 - Everything else (formatting, quote style, etc.) is enforced by Oxlint/Prettier/tsc — run them, don't hand-check. Import order is not lint-enforced (no Oxlint equivalent to the old `import/order`); keep imports reasonably grouped by convention.
 

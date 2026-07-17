@@ -103,3 +103,7 @@ dist
 # build file
 extension
 extension.zip
+
+# Playwright output
+playwright-report
+test-results
