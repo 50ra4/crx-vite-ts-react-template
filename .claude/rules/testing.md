@@ -11,7 +11,8 @@ Vitest + jsdom (`vitest.config.ts`: `test: { globals: true, environment: 'jsdom'
   see `useIncrement.test.ts`).
 - Pure functions: plain unit tests (see `calc.test.ts`).
 - Run: `npm test`; watch mode: `npm test -- --watch`.
-- Chrome API を使うテストは `src/lib/testing/chromeFake.ts` の `installChromeFake` を使う。
-  runtime messaging と storage の個別モックを各テストへ重複実装しない。
-- `installChromeFake` は `vi.stubGlobal` で注入するため、`afterEach` で
-  `vi.unstubAllGlobals()` を呼ぶ。
+- Tests that use Chrome APIs must call `installChromeFake` from
+  `src/lib/testing/chromeFake.ts`. Do not duplicate runtime messaging or storage
+  mocks in individual test files.
+- Because `installChromeFake` injects the global with `vi.stubGlobal`, call
+  `vi.unstubAllGlobals()` in `afterEach`.

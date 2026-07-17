@@ -27,8 +27,8 @@
   },
   "overrides": [
     {
-      // Chrome API の実参照は lib の薄い境界層に閉じ込める。型名前空間としての
-      // chrome は no-restricted-globals の対象外なので、@types/chrome は全域で使える。
+      // Keep runtime Chrome API access behind thin src/lib boundaries. Type-only
+      // references through the chrome namespace remain available throughout the project.
       "files": ["src/**/*.{ts,tsx}"],
       "excludeFiles": ["src/lib/**/*.{ts,tsx}"],
       "rules": {
@@ -36,14 +36,14 @@
           "error",
           {
             "name": "chrome",
-            "message": "Chrome API は src/lib のラッパー経由で利用してください。"
+            "message": "Use Chrome APIs through wrappers in src/lib."
           }
         ],
         "no-restricted-properties": [
           "error",
           {
             "property": "chrome",
-            "message": "Chrome API は src/lib のラッパー経由で利用してください。"
+            "message": "Use Chrome APIs through wrappers in src/lib."
           }
         ]
       }
