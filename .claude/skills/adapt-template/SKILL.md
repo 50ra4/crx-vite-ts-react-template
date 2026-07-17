@@ -12,14 +12,16 @@ Checklist:
   `permissions` (currently just `['background']`), and review
   `content_scripts[].matches` — the template ships with a sample match on
   `https://example.com/*`.
-- **Delete or replace sample code**:
-  - `src/components/SampleComponent.tsx` + its `.test.tsx`
-  - `src/hooks/useIncrement.ts` + its `.test.ts`
-  - `src/utils/calc.ts` + its `.test.ts`
-  - `src/content_scripts/sample.tsx` — also remove its `content_scripts[]`
+- **Delete or replace sample code**: `src/examples/` collects everything
+  disposable — delete the whole directory in one shot, or replace pieces
+  individually:
+  - `src/examples/components/SampleComponent.tsx` + its `.test.tsx`
+  - `src/examples/hooks/useIncrement.ts` + its `.test.ts`
+  - `src/examples/utils/calc.ts` + its `.test.ts`
+  - `src/entrypoints/content/sample.tsx` — also remove its `content_scripts[]`
     entry in `manifest.config.ts`
-- **Remove unused surfaces**: if you don't need e.g. the devtools page or
-  options page, delete the HTML file, the `src/<name>.tsx` file, and the
+- **Remove unused surfaces**: if you don't need e.g. the options page, delete
+  the HTML file, the `src/entrypoints/<surface>/<name>.tsx` file, and the
   matching key in `manifest.config.ts` together (see `.claude/skills/add-entrypoint/SKILL.md`
   for what the three wiring points are).
 - **Icons**: replace files under `public/logo/` (icon16/48/128, plus the

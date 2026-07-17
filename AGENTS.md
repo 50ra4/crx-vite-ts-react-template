@@ -1,10 +1,13 @@
 # crx-vite-ts-react-template
 
 Chrome extension (Manifest V3) template built with Vite + TypeScript + React.
-Surfaces: popup, options page, devtools page, background service worker, content script.
-Root-level HTML files load `src/<name>.tsx`; the manifest is generated from
+Surfaces: popup, options page, background service worker, content script — each
+lives under `src/entrypoints/<surface>/`. Root-level HTML files (popup/options)
+load `src/entrypoints/<surface>/<surface>.tsx`; the manifest is generated from
 `manifest.config.ts` via `@crxjs/vite-plugin`; `npm run build` outputs to
-`extension/` (gitignored).
+`extension/` (gitignored). `src/lib/` holds shared modules entrypoints may
+import (never the reverse); `src/examples/` holds deletable sample code. See
+README's "ディレクトリ構成" section for the full dependency-direction rules.
 
 ## Commands
 
@@ -18,7 +21,6 @@ Root-level HTML files load `src/<name>.tsx`; the manifest is generated from
 | `npm run lint` | `oxlint` (check-only) | no file mutation; pre-commit runs the staged-only equivalent via lint-staged |
 | `npm run format` | `prettier --write` | rewrites files on disk; pre-commit runs the staged-only equivalent via lint-staged |
 | `npm run zip` | build + `extension.zip` | |
-| `npm run docs` | rebuild `docs/` from `gh-pages/` + zip | used by GitHub Pages deploy |
 
 `.nvmrc` pins Node 24, matching the `engines.node` (`>=24.0.0`) requirement.
 
@@ -39,7 +41,7 @@ Read these only when the row matches your task — they are excluded from the al
 | editing any `.ts`/`.tsx` file | `.claude/rules/typescript-react.md` |
 | touching `manifest.config.ts`, background, or content scripts | `.claude/rules/chrome-extension.md` |
 | writing tests | `.claude/rules/testing.md` |
-| adding an extension surface (popup/options/devtools/content script) | `.claude/skills/add-entrypoint/SKILL.md` |
+| adding an extension surface (popup/options/background/content script) | `.claude/skills/add-entrypoint/SKILL.md` |
 | turning this template into a real extension project | `.claude/skills/adapt-template/SKILL.md` |
 | releasing/packaging/deploying | `.claude/skills/release/SKILL.md` |
 
