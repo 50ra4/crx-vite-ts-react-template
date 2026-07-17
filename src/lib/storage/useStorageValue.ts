@@ -13,6 +13,7 @@ export const useStorageValue = <Key extends StorageKey>(key: Key) => {
 
   useEffect(() => {
     let isMounted = true;
+    setValue(storageSchema[key].defaultValue);
 
     getStorageValue(key).then((storedValue) => {
       if (isMounted) {

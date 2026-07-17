@@ -1,18 +1,37 @@
-import React, { StrictMode, useEffect, useState } from 'react';
+import React, { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useStorageValue } from '../../lib/storage';
 
 const Root = () => {
   const [exampleSetting, setExampleSetting] = useStorageValue('exampleSetting');
   const [draftValue, setDraftValue] = useState(exampleSetting);
+  const [saveError, setSaveError] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+  const syncedSettingRef = useRef(exampleSetting);
 
   useEffect(() => {
-    setDraftValue(exampleSetting);
-  }, [exampleSetting]);
+    if (syncedSettingRef.current === exampleSetting) {
+      return;
+    }
 
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    syncedSettingRef.current = exampleSetting;
+
+    if (!isDirty) {
+      setDraftValue(exampleSetting);
+    }
+  }, [exampleSetting, isDirty]);
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    void setExampleSetting(draftValue);
+    setSaveError('');
+
+    try {
+      await setExampleSetting(draftValue);
+      syncedSettingRef.current = draftValue;
+      setIsDirty(false);
+    } catch (error: unknown) {
+      setSaveError(error instanceof Error ? error.message : String(error));
+    }
   };
 
   return (
@@ -29,7 +48,9 @@ const Root = () => {
         <input
           id="example-setting"
           onChange={(event) => {
-            setDraftValue(event.currentTarget.value);
+            const nextValue = event.currentTarget.value;
+            setDraftValue(nextValue);
+            setIsDirty(nextValue !== syncedSettingRef.current);
           }}
           type="text"
           value={draftValue}
@@ -37,6 +58,8 @@ const Root = () => {
         <button type="submit">保存</button>
       </form>
       <p>現在の保存値: {exampleSetting}</p>
+      {isDirty && <p>未保存の変更があります。</p>}
+      {saveError && <p role="alert">保存に失敗しました: {saveError}</p>}
     </main>
   );
 };
