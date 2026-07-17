@@ -15,23 +15,14 @@ description: "Package, verify, and distribute the extension: build extension.zip
 `npm run zip` runs the build and produces `extension.zip` at the repo root.
 Both `extension/` and `extension.zip` are gitignored — never commit them.
 
-**(c) GitHub Pages flow:**
+**(c) CI:**
 
-`npm run docs` = `rm -rf docs && cp -r gh-pages docs && npm run zip && mv extension.zip docs`
-— it copies the static `gh-pages/` site into `docs/` and drops the built
-`extension.zip` into it for download. `docs/` is also gitignored; it's
-generated fresh, not maintained by hand.
-`.github/workflows/deploy-docs.yml` runs `npm run docs` and publishes
-`./docs` to GitHub Pages on every push to `main`.
+`.github/workflows/ci.yml` runs on push to `main` and on pull requests, as four
+parallel jobs: `check-type`, `lint`, `test`, `build` (each `npm ci` then the
+matching npm script). Workflow-level `permissions: contents: read` and a
+`concurrency` group cancel stale runs on the same ref.
 
-**(d) CI:**
-
-`.github/workflows/ci.yml` runs on every push: `npm ci` → `npm run check-type`
-→ `npm run build` → `npm run test`. Lint is **not** part of CI — it only runs
-locally via the husky pre-commit hook, which runs lint-staged (`oxlint --fix`
-then `prettier --write`) against staged files only.
-
-**(e) Versioning:**
+**(d) Versioning:**
 
 Bump `version` in `package.json`. `manifest.config.ts` imports `version` from
 `package.json` and sets it directly as the manifest's `version` field, so no
