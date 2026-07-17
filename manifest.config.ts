@@ -26,7 +26,7 @@ export default defineManifest(({ command }) => ({
   options_ui: {
     page: 'options.html',
   },
-  permissions: ['background'],
+  permissions: ['background', 'storage'],
   content_scripts: [
     {
       matches: ['https://example.com/*'],

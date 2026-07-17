@@ -1,8 +1,10 @@
 import React, { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { useStorageValue } from '../../lib/storage';
 
 const Root = () => {
   const [response, setResponse] = useState('');
+  const [exampleSetting] = useStorageValue('exampleSetting');
 
   const onClick = () => {
     chrome.runtime.sendMessage('send message from popup', (res) => {
@@ -26,6 +28,7 @@ const Root = () => {
       >
         popup
       </h2>
+      <p>共有設定: {exampleSetting}</p>
       <button onClick={onClick}>send message</button>
       {response && <p>{response}</p>}
     </div>
