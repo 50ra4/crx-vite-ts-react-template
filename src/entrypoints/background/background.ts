@@ -1,6 +1,7 @@
-chrome.runtime.onMessage.addListener((request, _, sendResponse) => {
-  console.log('listen message', request);
-  sendResponse({ message: 'send response from background', request });
-});
+import { addMessageListeners } from '../../lib/messaging/messages';
 
-export {};
+// sender 検証・payload ガードはレイヤー側が既定で行う。ここでは検証済みの
+// 型付き payload を受け取り、型付き response を返すだけでよい。
+addMessageListeners({
+  greet: (payload) => ({ reply: `Hello, ${payload.text}!` }),
+});

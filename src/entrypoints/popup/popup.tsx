@@ -1,5 +1,6 @@
 import React, { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { sendMessage } from '../../lib/messaging/messages';
 import { useStorageValue } from '../../lib/storage';
 
 const Root = () => {
@@ -7,10 +8,10 @@ const Root = () => {
   const [exampleSetting] = useStorageValue('exampleSetting');
 
   const onClick = () => {
-    chrome.runtime.sendMessage('send message from popup', (res) => {
-      console.log(res);
-      setResponse(res?.message);
-    });
+    // payload / 戻り値の型は契約から推論される(型注釈不要)
+    sendMessage('greet', { text: 'popup' })
+      .then((res) => setResponse(res.reply))
+      .catch((error: unknown) => setResponse(String(error)));
   };
 
   return (
