@@ -1,44 +1,58 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
-# Controls when the action will run.
-on: push
+on:
+  push:
+    branches: [main]
+  pull_request:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # This workflow contains a single job called "build"
-  ci:
-    # The type of runner that the job will run on
+  check-type:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
-
-      # setup node (version pinned in .nvmrc)
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run check-type
 
-      # install npm packages
-      - name: install npm packages
-        run: |
-          npm ci
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
 
-      # check type
-      - name: check type
-        run: |
-          npm run check-type
-          
-      # check build
-      - name: check build
-        run: |
-          npm run build
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test
 
-      # check test
-      - name: test
-        run: |
-          npm run test
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build

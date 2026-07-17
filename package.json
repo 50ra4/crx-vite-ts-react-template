@@ -12,8 +12,7 @@
     "lint": "oxlint src *.config.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.config.ts\"",
     "check-type": "tsc --noEmit",
-    "test": "vitest run",
-    "docs": "rm -rf docs && cp -r gh-pages docs && npm run zip && mv extension.zip docs"
+    "test": "vitest run"
   },
   "lint-staged": {
     "*.{ts,tsx}": ["oxlint --fix", "prettier --write"]

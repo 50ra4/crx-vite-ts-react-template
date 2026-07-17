@@ -25,8 +25,5 @@ Checklist:
 - **Icons**: replace files under `public/logo/` (icon16/48/128, plus the
   `-dev` variants used by `npm run dev`).
 - **`README.md`**: rewrite for the real project (current one describes the template itself).
-- **GitHub Pages publishing**: if you won't publish a download page, delete
-  `gh-pages/`, the `docs` script in `package.json`, and
-  `.github/workflows/deploy-docs.yml`.
 - **After cleanup, confirm CI still passes locally**: `npm run check-type`,
   `npm run build`, `npm test`.
