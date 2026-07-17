@@ -25,6 +25,30 @@
     // must be enabled explicitly to preserve the old severity/intent.
     "typescript/no-non-null-assertion": "warn"
   },
+  "overrides": [
+    {
+      // Keep runtime Chrome API access behind thin src/lib boundaries. Type-only
+      // references through the chrome namespace remain available throughout the project.
+      "files": ["src/**/*.{ts,tsx}"],
+      "excludeFiles": ["src/lib/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "chrome",
+            "message": "Use Chrome APIs through wrappers in src/lib."
+          }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "property": "chrome",
+            "message": "Use Chrome APIs through wrappers in src/lib."
+          }
+        ]
+      }
+    }
+  ],
   "env": {
     "builtin": true,
     "browser": true

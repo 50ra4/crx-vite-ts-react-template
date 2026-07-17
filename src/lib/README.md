@@ -3,7 +3,12 @@
 entrypoints から利用する共有モジュールの置き場です。
 
 - 依存方向は `entrypoints → lib` のみ許可。`lib` から `entrypoints` への import は禁止
-- storage は後続 Issue で実装予定
+- Chrome API の実参照は `src/lib/` 内だけで許可。entrypoints などからは lib のラッパーを利用する
+- 例外が不可避な場合は `oxlint-disable` コメントに理由を記載し、境界違反を顕在化する
+
+テストでは `src/lib/testing/chromeFake.ts` の `installChromeFake` を使う。runtime
+messaging と storage(local / managed / session / sync)を in-memory で再現し、
+`vi.stubGlobal` でテストごとに注入できる。
 
 ## messaging(`src/lib/messaging/`)
 

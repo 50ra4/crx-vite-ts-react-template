@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installChromeFake, type ChromeFake } from '../testing/chromeFake';
 import {
   getStorageValue,
   onStorageValueChanged,
@@ -6,74 +7,14 @@ import {
   setStorageValue,
 } from './storage';
 
-type StorageListener = Parameters<
-  typeof chrome.storage.onChanged.addListener
->[0];
-
-const createStorageArea = () => {
-  const store = new Map<string, unknown>();
-
-  return {
-    get: vi.fn(
-      async (keys?: string | string[] | Record<string, unknown> | null) => {
-        if (typeof keys === 'string') {
-          return { [keys]: store.get(keys) };
-        }
-
-        if (Array.isArray(keys)) {
-          return Object.fromEntries(keys.map((key) => [key, store.get(key)]));
-        }
-
-        if (keys && typeof keys === 'object') {
-          return Object.fromEntries(
-            Object.entries(keys).map(([key, defaultValue]) => [
-              key,
-              store.has(key) ? store.get(key) : defaultValue,
-            ]),
-          );
-        }
-
-        return Object.fromEntries(store);
-      },
-    ),
-    remove: vi.fn(async (keys: string | string[]) => {
-      for (const key of Array.isArray(keys) ? keys : [keys]) {
-        store.delete(key);
-      }
-    }),
-    set: vi.fn(async (items: Record<string, unknown>) => {
-      for (const [key, value] of Object.entries(items)) {
-        store.set(key, value);
-      }
-    }),
-  };
-};
-
-const listeners = new Set<StorageListener>();
+let chromeFake: ChromeFake;
 
 beforeEach(() => {
-  const sync = createStorageArea();
-
-  globalThis.chrome = {
-    storage: {
-      sync,
-      local: createStorageArea(),
-      managed: createStorageArea(),
-      session: createStorageArea(),
-      onChanged: {
-        addListener: vi.fn((listener: StorageListener) => {
-          listeners.add(listener);
-        }),
-        removeListener: vi.fn((listener: StorageListener) => {
-          listeners.delete(listener);
-        }),
-      },
-    },
-  } as unknown as typeof chrome;
+  chromeFake = installChromeFake();
 });
 
 afterEach(() => {
-  listeners.clear();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -95,25 +36,19 @@ describe('typed storage', () => {
     await expect(getStorageValue('exampleSetting')).resolves.toBe('未設定');
   });
 
-  it('subscribes to typed storage changes for a key', () => {
+  it('subscribes to typed storage changes for a key', async () => {
     const listener = vi.fn();
     const unsubscribe = onStorageValueChanged('exampleSetting', listener);
 
-    for (const storageListener of listeners) {
-      storageListener(
-        {
-          exampleSetting: {
-            oldValue: '変更前',
-            newValue: '変更後',
-          },
-        },
-        'sync',
-      );
-    }
+    await setStorageValue('exampleSetting', '変更前');
+    listener.mockClear();
+    await setStorageValue('exampleSetting', '変更後');
 
     expect(listener).toHaveBeenCalledWith('変更後', '変更前');
 
     unsubscribe();
-    expect(chrome.storage.onChanged.removeListener).toHaveBeenCalledTimes(1);
+    expect(
+      chromeFake.chrome.storage.onChanged.removeListener,
+    ).toHaveBeenCalledTimes(1);
   });
 });
