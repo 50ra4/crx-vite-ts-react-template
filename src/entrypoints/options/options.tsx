@@ -42,7 +42,7 @@ const Root = () => {
       }}
     >
       <h1>Options</h1>
-      <p>保存した値は chrome.storage.sync に保持され、popup からも読めます。</p>
+      <p>保存した値は同期ストレージに保持され、popup からも読めます。</p>
       <form onSubmit={onSubmit}>
         <label htmlFor="example-setting">共有設定</label>
         <input

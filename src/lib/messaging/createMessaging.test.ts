@@ -1,3 +1,5 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installChromeFake, type ChromeFake } from '../testing/chromeFake';
 import { createMessaging, defineMessage } from './createMessaging';
 
 const EXTENSION_ID = 'test-extension-id';
@@ -15,46 +17,15 @@ const testMessages = {
   ),
 } as const;
 
-type Listener = (
-  message: unknown,
-  sender: chrome.runtime.MessageSender,
-  sendResponse: (response: unknown) => void,
-) => boolean | undefined;
-
-let listeners: Listener[] = [];
-// 次に送るメッセージの sender。既定は拡張自身(検証を通る)。
-let nextSender: chrome.runtime.MessageSender = { id: EXTENSION_ID };
-
-const setupChromeMock = () => {
-  listeners = [];
-  nextSender = { id: EXTENSION_ID };
-  const chromeMock = {
-    runtime: {
-      id: EXTENSION_ID,
-      onMessage: {
-        addListener: (fn: Listener) => listeners.push(fn),
-        removeListener: (fn: Listener) => {
-          listeners = listeners.filter((registered) => registered !== fn);
-        },
-      },
-      // 登録済みリスナへ配送し、最初に sendResponse された値で resolve する。
-      sendMessage: (message: unknown) =>
-        new Promise<unknown>((resolve) => {
-          for (const listener of listeners) {
-            const keepChannelOpen = listener(message, nextSender, resolve);
-            if (keepChannelOpen) return;
-          }
-          resolve(undefined);
-        }),
-    },
-  };
-  globalThis.chrome = chromeMock as unknown as typeof chrome;
-};
+let chromeFake: ChromeFake;
 
 describe('lib/messaging/createMessaging', () => {
-  beforeEach(setupChromeMock);
+  beforeEach(() => {
+    chromeFake = installChromeFake({ extensionId: EXTENSION_ID });
+  });
   afterEach(() => {
-    listeners = [];
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('型付き payload を送り、型付き response を受け取れる(正常往復)', async () => {
@@ -85,7 +56,7 @@ describe('lib/messaging/createMessaging', () => {
     addMessageListeners({ greet: (payload) => ({ reply: payload.text }) });
 
     // 型を迂回してガードに合致しない payload を直接送る
-    const response = await chrome.runtime.sendMessage({
+    const response = await chromeFake.chrome.runtime.sendMessage({
       __messageName: 'greet',
       payload: { text: 123 },
     });
@@ -100,7 +71,7 @@ describe('lib/messaging/createMessaging', () => {
     const { sendMessage, addMessageListeners } = createMessaging(testMessages);
     addMessageListeners({ greet: (payload) => ({ reply: payload.text }) });
 
-    nextSender = { id: 'malicious-extension-id' };
+    chromeFake.setRuntimeSender({ id: 'malicious-extension-id' });
 
     await expect(sendMessage('greet', { text: 'world' })).rejects.toThrow(
       /no valid response/,
@@ -111,7 +82,7 @@ describe('lib/messaging/createMessaging', () => {
     const { addMessageListeners } = createMessaging(testMessages);
     addMessageListeners({ greet: (payload) => ({ reply: payload.text }) });
 
-    const response = await chrome.runtime.sendMessage({
+    const response = await chromeFake.chrome.runtime.sendMessage({
       __messageName: 'unknown-message',
       payload: {},
     });

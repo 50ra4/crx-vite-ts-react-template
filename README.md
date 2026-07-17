@@ -76,13 +76,17 @@ type check、lint、test、build のチェックを、main への push と pull 
 ## ディレクトリ構成
 
 - `src/entrypoints/{popup,options,background,content}/` : 拡張機能の各サーフェス(エントリポイント)
-- `src/lib/` : entrypoints から利用する共有モジュール置き場(messaging / storage は後続 Issue で追加予定)
+- `src/lib/` : entrypoints から利用する共有モジュール置き場(messaging / storage、Chrome API 境界、共通テストfake)
 - `src/examples/` : 学習用のサンプル実装(components / hooks / utils)。不要であれば `src/examples/` ごと削除可能
 
 依存方向の規約:
 
 - `entrypoints → lib` は許可、`lib → entrypoints` は禁止
-- entrypoints 同士の直接 import は禁止(サーフェス間の通信は今後実装する messaging 経由)
+- entrypoints 同士の直接 import は禁止(サーフェス間の通信は messaging 経由)
+- `chrome` グローバルの実参照は `src/lib/` 内のみ許可。entrypoints から Chrome API を使う場合は lib に薄いラッパーを追加する
+
+この Chrome API 境界は Oxlint で静的に検査される。例外が不可避な場合だけ、理由を
+明記した `oxlint-disable` コメントを使用する。`@types/chrome` の型参照は全域で利用できる。
 
 DevTools パネルは本 template では提供していません。追加したい場合は
 [chrome.devtools 公式ドキュメント](https://developer.chrome.com/docs/extensions/reference/api/devtools)を参照してください。

@@ -25,6 +25,23 @@
     // must be enabled explicitly to preserve the old severity/intent.
     "typescript/no-non-null-assertion": "warn"
   },
+  "overrides": [
+    {
+      // Chrome API の実参照は lib の薄い境界層に閉じ込める。型名前空間としての
+      // chrome は no-restricted-globals の対象外なので、@types/chrome は全域で使える。
+      "files": ["src/**/*.{ts,tsx}"],
+      "excludeFiles": ["src/lib/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "chrome",
+            "message": "Chrome API は src/lib のラッパー経由で利用してください。"
+          }
+        ]
+      }
+    }
+  ],
   "env": {
     "builtin": true,
     "browser": true
