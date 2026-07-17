@@ -11,7 +11,7 @@
 npm i
 ```
 
-別途、node.js（^22.13.0 || >=24.0.0、推奨 24）が必要です。
+別途、node.js（>=24.0.0）が必要です。
 
 ## Build
 
@@ -46,25 +46,27 @@ npm run dev
 
 ## Linting
 
-ESLint を利用し、Lint を実行しています。
+Oxlint を利用し、Lint を実行しています(検査のみ、ファイルは書き換えません)。
 
 ```
-npm run lint:eslint
+npm run lint
 ```
 
 VSCode の拡張機能と併用することで、ファイル保存時に実行します。
-また、husky と併せて利用しており、commit 時にチェックを実行しているため、エラー状態での commit を抑止します。
+また、husky + lint-staged と併せて利用しており、commit 時に staged ファイルのみを検査するため、
+エラー状態での commit を抑止します(未 staged のファイルは対象外)。
 
 ## Formatting
 
 prettier を利用し、コードの整形を行なっています。
 
 ```
-npm run lint:prettier
+npm run format
 ```
 
 VSCode の拡張機能と併用することで、ファイル保存時に実行します。
-また、husky と併せて利用しており、commit 時にチェックを実行し、自動で整形します。
+また、husky + lint-staged と併せて利用しており、commit 時に staged ファイルのみを対象に
+自動で整形します。
 
 ## Document
 

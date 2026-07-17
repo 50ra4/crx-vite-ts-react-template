@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Ported from the old .eslintrc.js intent: eslint:recommended + import/errors +
+  // react/recommended + react-hooks/recommended + @typescript-eslint/recommended.
+  // typescript/unicorn/oxc are oxlint's zero-config default plugins (confirmed via
+  // `oxlint --init`); react/import are added on top for react(-hooks)/import parity.
+  //
+  // NOT ported: import/order. Oxlint has no source-path-based alphabetize+grouping
+  // rule. The closest existing rule, eslint/sort-imports, sorts by local binding
+  // name instead of source path — a different key that would reorder most imports
+  // in this repo for reasons unrelated to this migration. Left unenforced; see
+  // issue #25 PR description for the rationale (Issue's own risk-mitigation clause
+  // permits an explicit disable with reasoning when no faithful equivalent exists).
+  "plugins": ["typescript", "unicorn", "oxc", "react", "import"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    // react-hooks/recommended equivalent: rules-of-hooks is categorized "pedantic"
+    // in oxlint (off by default), so it must be enabled explicitly.
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    // @typescript-eslint/recommended (v5) sets this to "warn"; oxlint's
+    // "restriction" category (where this rule lives) is off by default, so it
+    // must be enabled explicitly to preserve the old severity/intent.
+    "typescript/no-non-null-assertion": "warn"
+  },
+  "env": {
+    "builtin": true,
+    "browser": true
+  }
+}

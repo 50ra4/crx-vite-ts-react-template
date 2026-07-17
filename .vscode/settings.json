@@ -4,9 +4,9 @@
   "editor.tabSize": 2,
   // prettier
   "editor.formatOnSave": true,
-  // eslint
+  // oxlint
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
+    "source.fixAll.oxc": true
   },
   // default formatter setting is prettier
   "editor.defaultFormatter": "esbenp.prettier-vscode"

@@ -15,11 +15,12 @@ Root-level HTML files load `src/<name>.tsx`; the manifest is generated from
 | `npm run build` | Build to `extension/` | deletes and recreates the dir |
 | `npm run check-type` | `tsc --noEmit` | |
 | `npm test` | Run Vitest | 3 sample tests, jsdom env |
-| `npm run lint` | prettier --write, then eslint --fix | **rewrites files on disk**; same command runs in the pre-commit hook |
+| `npm run lint` | `oxlint` (check-only) | no file mutation; pre-commit runs the staged-only equivalent via lint-staged |
+| `npm run format` | `prettier --write` | rewrites files on disk; pre-commit runs the staged-only equivalent via lint-staged |
 | `npm run zip` | build + `extension.zip` | |
 | `npm run docs` | rebuild `docs/` from `gh-pages/` + zip | used by GitHub Pages deploy |
 
-`.nvmrc` pins Node 24, matching the `engines.node` (`^22.13.0 || >=24.0.0`) requirement.
+`.nvmrc` pins Node 24, matching the `engines.node` (`>=24.0.0`) requirement.
 
 ## Conventions
 
@@ -27,7 +28,7 @@ Root-level HTML files load `src/<name>.tsx`; the manifest is generated from
 - Components are arrow functions.
 - Tests are colocated as `*.test.ts(x)` next to the source file.
 - Hooks return tuples `as const` (state, action).
-- Everything else (formatting, import order, quote style, etc.) is enforced by ESLint/Prettier/tsc — run them, don't hand-check.
+- Everything else (formatting, quote style, etc.) is enforced by Oxlint/Prettier/tsc — run them, don't hand-check. Import order is not lint-enforced (no Oxlint equivalent to the old `import/order`); keep imports reasonably grouped by convention.
 
 ## On-demand context
 

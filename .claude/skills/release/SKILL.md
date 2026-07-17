@@ -28,7 +28,8 @@ generated fresh, not maintained by hand.
 
 `.github/workflows/ci.yml` runs on every push: `npm ci` → `npm run check-type`
 → `npm run build` → `npm run test`. Lint is **not** part of CI — it only runs
-locally via the husky pre-commit hook (`lint:prettier` then `lint:eslint --cache`).
+locally via the husky pre-commit hook, which runs lint-staged (`oxlint --fix`
+then `prettier --write`) against staged files only.
 
 **(e) Versioning:**
 
