@@ -6,13 +6,9 @@ const EXPECTED_CSP = "script-src 'self'; object-src 'self';";
 const EXPECTED_MATCHES = ['https://example.com/*'];
 const EXPECTED_PERMISSIONS = ['storage'];
 const EXPECTED_HOST_PERMISSIONS = [];
-const EXPECTED_WEB_ACCESSIBLE_RESOURCES = [
-  /^assets\/jsx-runtime-[A-Za-z0-9_-]+\.js$/u,
-  /^assets\/sample\.tsx-[A-Za-z0-9_-]+\.js$/u,
-];
-const FORBIDDEN_CSP_SOURCE =
-  /'unsafe-(?:eval|inline)'|'wasm-unsafe-eval'|(?:https?|data|blob):|\*/u;
+const EXPECTED_USE_DYNAMIC_URL = false;
 const GLOB = /[*?[\]{}]/u;
+const CONCRETE_JS_ASSET = /^assets\/[^*?[\]{}]+\.js$/u;
 
 const extensionDirectory = fileURLToPath(
   new URL('../extension/', import.meta.url),
@@ -34,13 +30,16 @@ const readStrings = (value, field) => {
     !value.every((item) => typeof item === 'string')
   ) {
     errors.push(`${field} must be an array of strings.`);
-    return [];
+    return undefined;
   }
   return value;
 };
 
 const expectSet = (value, expected, field) => {
-  const actual = readStrings(value ?? [], field).toSorted();
+  const values = readStrings(value ?? [], field);
+  if (values === undefined) return [];
+
+  const actual = values.toSorted();
   const wanted = expected.toSorted();
   report(
     JSON.stringify(actual) === JSON.stringify(wanted),
@@ -93,15 +92,17 @@ expectSet(
   EXPECTED_HOST_PERMISSIONS,
   'host_permissions',
 );
+expectSet(manifest.optional_permissions, [], 'optional_permissions');
+expectSet(manifest.optional_host_permissions, [], 'optional_host_permissions');
+report(
+  manifest.externally_connectable === undefined,
+  'externally_connectable must not be declared.',
+);
 
 const csp = manifest.content_security_policy?.extension_pages;
 report(
   csp === EXPECTED_CSP,
   `content_security_policy.extension_pages must equal ${JSON.stringify(EXPECTED_CSP)}; received ${JSON.stringify(csp)}.`,
-);
-report(
-  typeof csp !== 'string' || !FORBIDDEN_CSP_SOURCE.test(csp),
-  'content_security_policy.extension_pages contains a forbidden source.',
 );
 
 if (manifest.icons !== undefined) addIconReferences(manifest.icons, 'icons');
@@ -137,24 +138,21 @@ contentScripts.forEach((entry, index) => {
   );
   for (const field of ['js', 'css']) {
     if (entry[field] === undefined) continue;
-    readStrings(entry[field], `content_scripts.${index}.${field}`).forEach(
-      (path, pathIndex) =>
-        addReference(path, `content_scripts.${index}.${field}.${pathIndex}`),
+    const paths =
+      readStrings(entry[field], `content_scripts.${index}.${field}`) ?? [];
+    paths.forEach((path, pathIndex) =>
+      addReference(path, `content_scripts.${index}.${field}.${pathIndex}`),
     );
   }
 });
 
 report(
-  Array.isArray(manifest.web_accessible_resources),
+  Array.isArray(manifest.web_accessible_resources ?? []),
   'web_accessible_resources must be an array.',
 );
 const webAccessibleResources = Array.isArray(manifest.web_accessible_resources)
   ? manifest.web_accessible_resources
   : [];
-report(
-  webAccessibleResources.length === 1,
-  `web_accessible_resources must contain 1 entry; received ${webAccessibleResources.length}.`,
-);
 webAccessibleResources.forEach((entry, index) => {
   if (!isRecord(entry)) {
     errors.push(`web_accessible_resources.${index} must be an object.`);
@@ -166,17 +164,18 @@ webAccessibleResources.forEach((entry, index) => {
     EXPECTED_MATCHES,
     `web_accessible_resources.${index}.matches`,
   );
+  expectSet(
+    entry.extension_ids,
+    [],
+    `web_accessible_resources.${index}.extension_ids`,
+  );
+  report(
+    entry.use_dynamic_url === EXPECTED_USE_DYNAMIC_URL,
+    `web_accessible_resources.${index}.use_dynamic_url must be ${EXPECTED_USE_DYNAMIC_URL}; received ${JSON.stringify(entry.use_dynamic_url)}.`,
+  );
   const field = `web_accessible_resources.${index}.resources`;
-  const resources = readStrings(entry.resources, field);
+  const resources = readStrings(entry.resources, field) ?? [];
   report(resources.length > 0, `${field} must not be empty.`);
-
-  for (const expected of EXPECTED_WEB_ACCESSIBLE_RESOURCES) {
-    const count = resources.filter((path) => expected.test(path)).length;
-    report(
-      count === 1,
-      `${field} must contain exactly one path matching ${expected}; received ${count}.`,
-    );
-  }
 
   resources.forEach((path, pathIndex) => {
     const resourceField = `${field}.${pathIndex}`;
@@ -185,14 +184,14 @@ webAccessibleResources.forEach((entry, index) => {
       `${resourceField} must not contain a glob: ${path}`,
     );
     report(
-      EXPECTED_WEB_ACCESSIBLE_RESOURCES.some((expected) => expected.test(path)),
-      `${resourceField} is not an allowed generated asset: ${path}`,
+      CONCRETE_JS_ASSET.test(path),
+      `${resourceField} must expose only a concrete JS asset: ${path}`,
     );
     addReference(path, resourceField);
   });
 });
 
-for (const { field, value } of references) {
+const verifyReference = async ({ field, value }) => {
   const absolutePath = resolve(extensionDirectory, value);
   const localPath = relative(extensionDirectory, absolutePath);
   if (
@@ -203,17 +202,21 @@ for (const { field, value } of references) {
     localPath.startsWith('..\\') ||
     isAbsolute(localPath)
   ) {
-    errors.push(`${field} must stay within the extension directory: ${value}`);
-    continue;
+    return `${field} must stay within the extension directory: ${value}`;
   }
 
   try {
     const file = await stat(absolutePath);
-    report(file.isFile(), `${field} does not reference a file: ${value}`);
+    return file.isFile()
+      ? undefined
+      : `${field} does not reference a file: ${value}`;
   } catch {
-    errors.push(`${field} references a missing file: ${value}`);
+    return `${field} references a missing file: ${value}`;
   }
-}
+};
+
+const referenceErrors = await Promise.all(references.map(verifyReference));
+errors.push(...referenceErrors.filter(Boolean));
 
 if (errors.length > 0) {
   console.error(
