@@ -7,7 +7,7 @@ load `src/entrypoints/<surface>/<surface>.tsx`; the manifest is generated from
 `manifest.config.ts` via `@crxjs/vite-plugin`; `npm run build` outputs to
 `extension/` (gitignored). `src/lib/` holds shared modules entrypoints may
 import (never the reverse); `src/examples/` holds deletable sample code. See
-README's "ディレクトリ構成" section for the full dependency-direction rules.
+README's "Architecture" section for the full dependency-direction rules.
 
 ## Commands
 

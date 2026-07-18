@@ -1,10 +1,14 @@
-# リリース手順
+# Releasing
 
-リリース元は `main` とし、Node.js 24 と `package-lock.json` の固定依存関係を使用する。
+**English** | [日本語](./releasing.ja.md)
 
-## 1. バージョン更新と検証
+Releases are cut from `main`, using Node.js 24 and the locked dependencies in
+`package-lock.json`.
 
-次期バージョンを指定すると、`package.json` と `package-lock.json` が同時に更新される。
+## 1. Bump the version and verify
+
+Specifying the next version updates `package.json` and `package-lock.json`
+together.
 
 ```sh
 npm version 1.1.0 --no-git-tag-version
@@ -16,16 +20,19 @@ npm run package
 npm run e2e
 ```
 
-`npm run package` は build と manifest 検証を行い、`extension/` 内の配布対象ファイルだけを
-リポジトリ直下の `extension.zip` に格納する。開発用アイコンは含めない。同一ソース・Node.js・
-lockfile からは同一内容の zip が生成される。`npm run zip` は互換用の別名である。
+`npm run package` builds, verifies the manifest, and stores only the
+distributable files from `extension/` in `extension.zip` at the repository
+root. Development icons are excluded. The same source, Node.js version, and
+lockfile always produce a byte-identical zip. `npm run zip` is a compatibility
+alias.
 
-生成物を手動確認する場合は `extension.zip` を展開し、Chrome の
-`chrome://extensions` で展開後のディレクトリを「パッケージ化されていない拡張機能を読み込む」から選択する。
+To inspect the artifact manually, unzip `extension.zip` and load the extracted
+directory in Chrome via `chrome://extensions` → **Load unpacked**.
 
-## 2. main とタグの push
+## 2. Push main and the tag
 
-バージョン更新をレビュー・マージした後、最新の `main` に `v` 接頭辞付きのタグを付ける。
+After the version bump is reviewed and merged, tag the latest `main` with a
+`v`-prefixed tag.
 
 ```sh
 git switch main
@@ -34,9 +41,12 @@ git tag -a v1.1.0 -m "v1.1.0"
 git push origin v1.1.0
 ```
 
-プレリリースは package version とタグの両方を `1.1.0-rc.1` / `v1.1.0-rc.1`
-のように一致させる。タグと `package.json` の version が一致しない場合、Release workflow は失敗する。
-Chrome Manifest の `version` には数値部分 (`1.1.0`)、`version_name` には完全なプレリリース版を記録する。
+For prereleases, keep the package version and the tag in sync, e.g.
+`1.1.0-rc.1` / `v1.1.0-rc.1`. If the tag and the `package.json` version do not
+match, the Release workflow fails. The Chrome manifest records the numeric
+core in `version` (`1.1.0`) and the full prerelease string in `version_name`.
 
-タグ push 後、GitHub Actions が type check、lint、unit test、manifest 検証、実 Chromium E2E を実行する。
-すべて成功した場合だけ、自動生成ノートと `extension.zip` を含む GitHub Release が作成される。
+After the tag is pushed, GitHub Actions runs the type check, lint, unit tests,
+manifest verification, and the real-Chromium E2E. Only if everything passes is
+a GitHub Release created, with auto-generated notes and `extension.zip`
+attached.
