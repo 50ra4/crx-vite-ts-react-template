@@ -2,6 +2,8 @@ import { readFile, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createManifestVersion } from './manifest-version.mjs';
+
 const EXPECTED_CSP = "script-src 'self'; object-src 'self';";
 const EXPECTED_MATCHES = ['https://example.com/*'];
 const EXPECTED_PERMISSIONS = ['storage'];
@@ -93,19 +95,15 @@ if (!isRecord(packageJson) || typeof packageJson.version !== 'string') {
   process.exit(1);
 }
 
-const expectedManifestVersion = packageJson.version.replace(/[-+].*$/u, '');
-const expectedVersionName =
-  expectedManifestVersion === packageJson.version
-    ? undefined
-    : packageJson.version;
+const expectedManifestVersion = createManifestVersion(packageJson.version);
 
 report(
-  manifest.version === expectedManifestVersion,
-  `version must equal ${JSON.stringify(expectedManifestVersion)}; received ${JSON.stringify(manifest.version)}.`,
+  manifest.version === expectedManifestVersion.version,
+  `version must equal ${JSON.stringify(expectedManifestVersion.version)}; received ${JSON.stringify(manifest.version)}.`,
 );
 report(
-  manifest.version_name === expectedVersionName,
-  `version_name must equal ${JSON.stringify(expectedVersionName)}; received ${JSON.stringify(manifest.version_name)}.`,
+  manifest.version_name === expectedManifestVersion.version_name,
+  `version_name must equal ${JSON.stringify(expectedManifestVersion.version_name)}; received ${JSON.stringify(manifest.version_name)}.`,
 );
 
 report(

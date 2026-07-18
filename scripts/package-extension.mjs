@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { zipSync } from 'fflate';
 
 const FIXED_MTIME = new Date(1980, 0, 1, 0, 0, 0);
-const FILE_ATTRIBUTES = 0o644 << 16;
-const DEVELOPMENT_ICON = /^logo\/icon(?:16|48|128)-dev\.png$/u;
+const FILE_ATTRIBUTES = 0o100644 << 16;
+// Vite copies public/logo/ to extension/logo/ during production builds, while
+// CRXJS separately emits the manifest-referenced production icons under
+// extension/public/logo/. Exclude only Vite's unreferenced development copies.
+const VITE_COPIED_DEVELOPMENT_ICON = /^logo\/icon(?:16|48|128)-dev\.png$/u;
 
 const repositoryDirectory = fileURLToPath(new URL('../', import.meta.url));
 const extensionDirectory = resolve(repositoryDirectory, 'extension');
@@ -20,26 +23,23 @@ const collectFiles = async (rootDirectory, currentDirectory) => {
     left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
   );
 
-  const files = [];
-  for (const entry of entries) {
-    const absolutePath = resolve(currentDirectory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await collectFiles(rootDirectory, absolutePath)));
-      continue;
-    }
-    if (!entry.isFile()) {
-      throw new Error(`Unsupported extension entry: ${absolutePath}`);
-    }
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const absolutePath = resolve(currentDirectory, entry.name);
+      if (entry.isDirectory()) {
+        return collectFiles(rootDirectory, absolutePath);
+      }
+      if (!entry.isFile()) {
+        throw new Error(`Unsupported extension entry: ${absolutePath}`);
+      }
 
-    const archivePath = toArchivePath(relative(rootDirectory, absolutePath));
-    if (!DEVELOPMENT_ICON.test(archivePath)) {
-      files.push({
-        data: await readFile(absolutePath),
-        path: archivePath,
-      });
-    }
-  }
-  return files;
+      const entryPath = toArchivePath(relative(rootDirectory, absolutePath));
+      if (VITE_COPIED_DEVELOPMENT_ICON.test(entryPath)) return [];
+
+      return [{ data: await readFile(absolutePath), path: entryPath }];
+    }),
+  );
+  return files.flat();
 };
 
 export const createExtensionArchive = async ({

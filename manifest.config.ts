@@ -1,7 +1,8 @@
 import { defineManifest } from '@crxjs/vite-plugin';
 import { name, version } from './package.json';
+import { createManifestVersion } from './scripts/manifest-version.mjs';
 
-const manifestVersion = version.replace(/[-+].*$/u, '');
+const manifestVersion = createManifestVersion(version);
 
 const EXTENSION_NAMES = {
   build: name,
@@ -13,8 +14,7 @@ const createIconFileSuffix = (command: 'build' | 'serve') =>
 
 // import to `vite.config.ts`
 export default defineManifest(({ command }) => ({
-  version: manifestVersion,
-  ...(manifestVersion === version ? {} : { version_name: version }),
+  ...manifestVersion,
   manifest_version: 3,
   name: EXTENSION_NAMES[command],
   description: '',

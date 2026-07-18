@@ -26,25 +26,36 @@ afterEach(async () => {
   await rm(temporaryDirectory, { force: true, recursive: true });
 });
 
-test('archives only sorted extension contents without a root directory', async () => {
+test('archives sorted distributable contents without Vite-copied development icons', async () => {
   const sourceDirectory = join(temporaryDirectory, 'extension');
   await mkdir(join(sourceDirectory, 'assets'), { recursive: true });
   await mkdir(join(sourceDirectory, 'logo'));
+  await mkdir(join(sourceDirectory, 'public', 'logo'), { recursive: true });
   await writeFile(
     join(sourceDirectory, 'manifest.json'),
     '{"version":"1.0.0"}',
   );
   await writeFile(join(sourceDirectory, 'assets', 'app.js'), 'console.log(1);');
+  await writeFile(join(sourceDirectory, 'logo', 'icon16.png'), 'production');
   await writeFile(
     join(sourceDirectory, 'logo', 'icon16-dev.png'),
     'development',
+  );
+  await writeFile(
+    join(sourceDirectory, 'public', 'logo', 'icon16.png'),
+    'manifest production',
   );
 
   const outputPath = join(temporaryDirectory, 'extension.zip');
   await createExtensionArchive({ sourceDirectory, outputPath });
 
   const files = unzipSync(await readFile(outputPath));
-  expect(Object.keys(files)).toEqual(['assets/app.js', 'manifest.json']);
+  expect(Object.keys(files)).toEqual([
+    'assets/app.js',
+    'logo/icon16.png',
+    'manifest.json',
+    'public/logo/icon16.png',
+  ]);
   expect(strFromU8(files['manifest.json'])).toBe('{"version":"1.0.0"}');
 });
 
