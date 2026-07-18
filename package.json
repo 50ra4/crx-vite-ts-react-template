@@ -1,7 +1,19 @@
 {
   "name": "crx-vite-ts-react-template",
   "version": "1.0.0",
-  "description": "Chrome extension template using Vite, TypeScript and React",
+  "description": "Chrome extension (MV3) template with Vite, TypeScript, React & CRXJS — all four surfaces (popup, options, background, content script) wired via typed messaging & storage, plus a build/verify/release pipeline.",
+  "keywords": [
+    "chrome-extension",
+    "manifest-v3",
+    "vite",
+    "typescript",
+    "react",
+    "crxjs",
+    "template",
+    "boilerplate",
+    "typed-messaging",
+    "typed-storage"
+  ],
   "main": "index.js",
   "scripts": {
     "prepare": "husky",
