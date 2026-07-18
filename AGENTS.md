@@ -17,6 +17,8 @@ README's "ディレクトリ構成" section for the full dependency-direction ru
 | `npm run dev` | Vite dev server with HMR | via `@crxjs/vite-plugin` |
 | `npm run build` | Build to `extension/` | deletes and recreates the dir |
 | `npm run package` | Build, verify manifest, create reproducible `extension.zip` | archives distributable files from `extension/` |
+| `npm run verify` | check-type → lint → test → build → verify:manifest, in series | the safety contract for most changes; excludes e2e for speed |
+| `npm run verify:full` | `verify` then `npm run e2e` | full contract; requires installed Chromium |
 | `npm run e2e` | Run Playwright Chromium smoke tests | requires a prior build and installed Chromium |
 | `npm run check-type` | `tsc --noEmit` | |
 | `npm test` | Run Vitest | src tests use jsdom; script tests use Node |
@@ -25,6 +27,88 @@ README's "ディレクトリ構成" section for the full dependency-direction ru
 | `npm run zip` | Alias for `npm run package` | |
 
 `.nvmrc` pins Node 24, matching the `engines.node` (`>=24.0.0`) requirement.
+
+## Verification contract
+
+After changing code, prove it is safe with a single command. **The source of truth
+is the checks themselves** (types, lint, tests, `verify:manifest`) — this section
+only tells you which to run.
+
+- `npm run verify` — check-type → lint → test → build → verify:manifest, in series.
+  This is the contract for most changes. `verify:manifest` reads the built
+  `extension/manifest.json`, so `build` always runs before it. e2e is excluded here
+  because it needs a real Chromium and is slow.
+- `npm run verify:full` — `verify` then `npm run e2e` (real Chromium smoke tests).
+  Run this when your change could affect the built extension's runtime wiring.
+
+Minimum verification per change type:
+
+| Change | Run |
+| --- | --- |
+| `src/lib/**`, types, unit tests, `src/examples/**` | `npm run verify` |
+| `manifest.config.ts`, permissions, CSP | `npm run verify` (asserts the manifest) |
+| entrypoint wiring, messaging/storage round-trips, anything e2e exercises | `npm run verify:full` |
+
+CI is not changed by this file: it already runs the same underlying checks as
+separate jobs. `verify` / `verify:full` are the local and agent-facing entry points.
+
+## Architecture invariants
+
+These hold regardless of the task. Where a check enforces an invariant, that check —
+not this file — is the authority; the note explains the intent a check cannot.
+
+- **Dependency direction is `entrypoints → lib` only; `lib` never imports from
+  `entrypoints`.** `src/lib/` stays reusable and unit-testable in isolation
+  (with `installChromeFake` from `src/lib/testing/chromeFake.ts`); a back-edge would
+  couple shared code to one surface.
+- **Entrypoints do not import each other directly.** Surfaces are separate runtime
+  contexts (popup / options / background / content); they communicate through the
+  typed messaging layer in `src/lib/messaging/`, not shared module state.
+- **Real `chrome.*` access lives only inside `src/lib/`.** Outside `src/lib/**`,
+  referencing the `chrome` global is an Oxlint error (`no-restricted-globals` /
+  `no-restricted-properties` override in `.oxlintrc.json`); route the call through a
+  thin `src/lib/` wrapper instead. Type-only references via the `chrome` namespace
+  (`@types/chrome`) are allowed everywhere. An unavoidable exception must carry a
+  reasoned `oxlint-disable` comment so the boundary violation stays visible.
+
+## Recipes
+
+Minimal, real code paths for the common changes. Each recipe ends with the
+verification its change type calls for in **Verification contract** above — not a
+blanket command.
+
+- **Add a message type.** In `src/lib/messaging/messages.ts`, add one entry to
+  `messages` via `defineMessage(isRequest, isResponse)` (hand-written type-guard
+  predicates — no runtime schema dependency). Register the handler in
+  `src/entrypoints/background/background.ts` under `addMessageListeners({ ... })`, and
+  send from a surface with `sendMessage(name, payload)`. The generic engine in
+  `createMessaging.ts` needs no change; sender check and payload guards are automatic.
+  This touches entrypoint wiring (`background.ts` + a surface), so verify with
+  **`npm run verify:full`** — only the real-Chromium e2e exercises the messaging round-trip.
+- **Add a storage key.** In `src/lib/storage/schema.ts`, add the key to the
+  `AppStorageValues` type and to `storageSchema` (`area` + `defaultValue`). Everything
+  else (`getStorageValue` / `setStorageValue` / `removeStorageValue` /
+  `onStorageValueChanged` / `useStorageValue`) is generic and follows automatically.
+  The schema edit is `src/lib/**`-only, so **`npm run verify`** covers it; if you also
+  wire a surface to read or write the key, verify that with `npm run verify:full`.
+- **Add a Chrome permission.** Add it to `permissions` (or `host_permissions` /
+  `optional_permissions`) in `manifest.config.ts`, **and** update the matching
+  allowlist (`EXPECTED_PERMISSIONS`, `EXPECTED_HOST_PERMISSIONS`, …) in
+  `scripts/verify-manifest.mjs`. A mismatch makes `verify:manifest` fail by design —
+  that failure is the guard against silent privilege growth. **`npm run verify`** asserts it.
+
+## Forbidden changes
+
+Do not make these without explicit owner sign-off. Most are enforced by
+`scripts/verify-manifest.mjs`, which fails the build on violation:
+
+- Adding a manifest `permission` / `host_permission` without updating the
+  `verify-manifest.mjs` allowlist (and without a reason to hold the new privilege).
+- Adding an external runtime dependency to `src/lib/` — the messaging and storage
+  layers are dependency-free by design; keep them so.
+- Relaxing the CSP. `verify:manifest` pins
+  `content_security_policy.extension_pages` to `script-src 'self'; object-src 'self';`.
+- Declaring `externally_connectable` — `verify:manifest` rejects it outright.
 
 ## Conventions
 
