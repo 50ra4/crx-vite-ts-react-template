@@ -51,12 +51,16 @@ when an individual is officially representing the community in public spaces.
 
 ## Enforcement
 
-A dedicated private contact channel is not yet published; tracked in
+A dedicated private contact channel for Code of Conduct reports is not yet
+published; tracked in
 [#58](https://github.com/50ra4/crx-vite-ts-react-template/issues/58). Until it
 is set up, please report instances of abusive, harassing, or otherwise
-unacceptable behavior by opening a GitHub issue addressed to the maintainer
-([@50ra4](https://github.com/50ra4)). All complaints will be reviewed and
-investigated promptly and fairly.
+unacceptable behavior privately through GitHub's [Private Vulnerability
+Reporting](./SECURITY.md) (repository's **Security** tab → **Report a
+vulnerability**) rather than a public issue — this keeps the report
+confidential between you and the maintainer even though the feature is
+named for security issues. All complaints will be reviewed and investigated
+promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident.
