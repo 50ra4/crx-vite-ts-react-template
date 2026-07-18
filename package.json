@@ -7,6 +7,8 @@
     "prepare": "husky",
     "dev": "vite",
     "build": "rm -rf extension && vite build",
+    "verify": "npm run check-type && npm run lint && npm run test && npm run build && npm run verify:manifest",
+    "verify:full": "npm run verify && npm run e2e",
     "verify:manifest": "node scripts/verify-manifest.mjs",
     "verify:release-version": "node scripts/verify-release-version.mjs",
     "e2e": "playwright test",
