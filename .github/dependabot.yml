@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-dependencies:
+        update-types:
+          - "minor"
+          - "patch"
+    # メジャーバージョン更新はグルーピング対象外で個別PRとして作成される。
+    # 破壊的変更を含む可能性があるため、CHANGELOG確認のうえ手動で判断すること。
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions-dependencies:
+        update-types:
+          - "minor"
+          - "patch"
+    # メジャーバージョン更新は個別PRになる。破壊的変更の可能性があるため手動で判断すること。
