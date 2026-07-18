@@ -73,7 +73,9 @@ not this file — is the authority; the note explains the intent a check cannot.
 
 ## Recipes
 
-Minimal, real code paths for the common changes. Finish each with `npm run verify`.
+Minimal, real code paths for the common changes. Each recipe ends with the
+verification its change type calls for in **Verification contract** above — not a
+blanket command.
 
 - **Add a message type.** In `src/lib/messaging/messages.ts`, add one entry to
   `messages` via `defineMessage(isRequest, isResponse)` (hand-written type-guard
@@ -81,15 +83,19 @@ Minimal, real code paths for the common changes. Finish each with `npm run verif
   `src/entrypoints/background/background.ts` under `addMessageListeners({ ... })`, and
   send from a surface with `sendMessage(name, payload)`. The generic engine in
   `createMessaging.ts` needs no change; sender check and payload guards are automatic.
+  This touches entrypoint wiring (`background.ts` + a surface), so verify with
+  **`npm run verify:full`** — only the real-Chromium e2e exercises the messaging round-trip.
 - **Add a storage key.** In `src/lib/storage/schema.ts`, add the key to the
   `AppStorageValues` type and to `storageSchema` (`area` + `defaultValue`). Everything
   else (`getStorageValue` / `setStorageValue` / `removeStorageValue` /
   `onStorageValueChanged` / `useStorageValue`) is generic and follows automatically.
+  The schema edit is `src/lib/**`-only, so **`npm run verify`** covers it; if you also
+  wire a surface to read or write the key, verify that with `npm run verify:full`.
 - **Add a Chrome permission.** Add it to `permissions` (or `host_permissions` /
   `optional_permissions`) in `manifest.config.ts`, **and** update the matching
   allowlist (`EXPECTED_PERMISSIONS`, `EXPECTED_HOST_PERMISSIONS`, …) in
   `scripts/verify-manifest.mjs`. A mismatch makes `verify:manifest` fail by design —
-  that failure is the guard against silent privilege growth.
+  that failure is the guard against silent privilege growth. **`npm run verify`** asserts it.
 
 ## Forbidden changes
 
