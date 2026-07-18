@@ -36,6 +36,7 @@ git push origin v1.1.0
 
 プレリリースは package version とタグの両方を `1.1.0-rc.1` / `v1.1.0-rc.1`
 のように一致させる。タグと `package.json` の version が一致しない場合、Release workflow は失敗する。
+Chrome Manifest の `version` には数値部分 (`1.1.0`)、`version_name` には完全なプレリリース版を記録する。
 
 タグ push 後、GitHub Actions が type check、lint、unit test、manifest 検証、実 Chromium E2E を実行する。
 すべて成功した場合だけ、自動生成ノートと `extension.zip` を含む GitHub Release が作成される。

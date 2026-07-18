@@ -30,7 +30,8 @@ a GitHub Release with generated notes and `extension.zip`.
 
 **(d) Versioning:**
 
-Bump `version` in `package.json`. `manifest.config.ts` imports `version` from
-`package.json` and sets it directly as the manifest's `version` field, so no
-separate manifest edit is needed. Follow `docs/releasing.md`; use `npm version
-<version> --no-git-tag-version` to keep `package-lock.json` aligned.
+Bump `version` in `package.json`; no separate manifest edit is needed. Stable
+versions are copied to manifest `version`. Prereleases use the numeric SemVer
+core for `version` and the complete package version for `version_name`. Follow
+`docs/releasing.md`; use `npm version <version> --no-git-tag-version` to keep
+`package-lock.json` aligned.

@@ -9,6 +9,9 @@ MV3 facts specific to this repo:
 - Dev vs. build differ in `manifest.config.ts`: the extension name is prefixed
   `[DEV] ${name}` when `command === 'serve'`, and icon filenames get a `-dev`
   suffix (`createIconFileSuffix`).
+- Stable package versions are copied to manifest `version`. For prereleases,
+  manifest `version` uses the numeric SemVer core and `version_name` preserves
+  the complete package version because Chrome rejects prerelease text in `version`.
 - Messaging goes through the typed layer in `src/lib/messaging/`, never
   `chrome.runtime.sendMessage` / `onMessage` directly. Declare the contract in
   `src/lib/messaging/messages.ts` (`defineMessage`), send with `sendMessage(name, payload)`
