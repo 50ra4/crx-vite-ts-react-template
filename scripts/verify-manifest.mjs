@@ -2,6 +2,8 @@ import { readFile, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createManifestVersion } from './manifest-version.mjs';
+
 const EXPECTED_CSP = "script-src 'self'; object-src 'self';";
 const EXPECTED_MATCHES = ['https://example.com/*'];
 const EXPECTED_PERMISSIONS = ['storage'];
@@ -13,6 +15,7 @@ const extensionDirectory = fileURLToPath(
   new URL('../extension/', import.meta.url),
 );
 const manifestPath = resolve(extensionDirectory, 'manifest.json');
+const packagePath = fileURLToPath(new URL('../package.json', import.meta.url));
 const errors = [];
 const references = [];
 
@@ -68,8 +71,12 @@ const addIconReferences = (icons, field) => {
 };
 
 let manifest;
+let packageJson;
 try {
-  manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  [manifest, packageJson] = await Promise.all([
+    readFile(manifestPath, 'utf8').then(JSON.parse),
+    readFile(packagePath, 'utf8').then(JSON.parse),
+  ]);
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`Manifest verification failed:\n- ${message}`);
@@ -80,6 +87,24 @@ if (!isRecord(manifest)) {
   console.error('Manifest verification failed:\n- manifest must be an object.');
   process.exit(1);
 }
+
+if (!isRecord(packageJson) || typeof packageJson.version !== 'string') {
+  console.error(
+    'Manifest verification failed:\n- package.json version must be a string.',
+  );
+  process.exit(1);
+}
+
+const expectedManifestVersion = createManifestVersion(packageJson.version);
+
+report(
+  manifest.version === expectedManifestVersion.version,
+  `version must equal ${JSON.stringify(expectedManifestVersion.version)}; received ${JSON.stringify(manifest.version)}.`,
+);
+report(
+  manifest.version_name === expectedManifestVersion.version_name,
+  `version_name must equal ${JSON.stringify(expectedManifestVersion.version_name)}; received ${JSON.stringify(manifest.version_name)}.`,
+);
 
 report(
   manifest.manifest_version === 3,
