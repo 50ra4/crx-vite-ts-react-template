@@ -3,7 +3,7 @@
 Thanks for your interest in contributing to this project. This document covers
 setup, verification commands, and the branch/PR flow. For architecture,
 directory layout, and dependency-direction rules, see the README's
-"ディレクトリ構成" section. For AI-agent-specific conventions, see
+"Architecture" section. For AI-agent-specific conventions, see
 `AGENTS.md` and `.claude/rules/`.
 
 ## Getting started
