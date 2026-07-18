@@ -26,7 +26,7 @@ afterEach(async () => {
   await rm(temporaryDirectory, { force: true, recursive: true });
 });
 
-test('archives sorted distributable contents without Vite-copied development icons', async () => {
+test('archives sorted distributable contents without Vite-copied icons', async () => {
   const sourceDirectory = join(temporaryDirectory, 'extension');
   await mkdir(join(sourceDirectory, 'assets'), { recursive: true });
   await mkdir(join(sourceDirectory, 'logo'));
@@ -52,7 +52,6 @@ test('archives sorted distributable contents without Vite-copied development ico
   const files = unzipSync(await readFile(outputPath));
   expect(Object.keys(files)).toEqual([
     'assets/app.js',
-    'logo/icon16.png',
     'manifest.json',
     'public/logo/icon16.png',
   ]);

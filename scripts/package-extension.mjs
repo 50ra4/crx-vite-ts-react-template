@@ -8,8 +8,8 @@ const FIXED_MTIME = new Date(1980, 0, 1, 0, 0, 0);
 const FILE_ATTRIBUTES = 0o100644 << 16;
 // Vite copies public/logo/ to extension/logo/ during production builds, while
 // CRXJS separately emits the manifest-referenced production icons under
-// extension/public/logo/. Exclude only Vite's unreferenced development copies.
-const VITE_COPIED_DEVELOPMENT_ICON = /^logo\/icon(?:16|48|128)-dev\.png$/u;
+// extension/public/logo/. Exclude Vite's unreferenced duplicate icon copies.
+const VITE_COPIED_ICON = /^logo\/icon(?:16|48|128)(?:-dev)?\.png$/u;
 
 const repositoryDirectory = fileURLToPath(new URL('../', import.meta.url));
 const extensionDirectory = resolve(repositoryDirectory, 'extension');
@@ -34,7 +34,7 @@ const collectFiles = async (rootDirectory, currentDirectory) => {
       }
 
       const entryPath = toArchivePath(relative(rootDirectory, absolutePath));
-      if (VITE_COPIED_DEVELOPMENT_ICON.test(entryPath)) return [];
+      if (VITE_COPIED_ICON.test(entryPath)) return [];
 
       return [{ data: await readFile(absolutePath), path: entryPath }];
     }),
