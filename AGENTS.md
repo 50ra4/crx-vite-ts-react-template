@@ -92,23 +92,28 @@ blanket command.
   The schema edit is `src/lib/**`-only, so **`npm run verify`** covers it; if you also
   wire a surface to read or write the key, verify that with `npm run verify:full`.
 - **Add a Chrome permission.** Add it to `permissions` (or `host_permissions` /
-  `optional_permissions`) in `manifest.config.ts`, **and** update the matching
-  allowlist (`EXPECTED_PERMISSIONS`, `EXPECTED_HOST_PERMISSIONS`, …) in
-  `scripts/verify-manifest.mjs`. A mismatch makes `verify:manifest` fail by design —
-  that failure is the guard against silent privilege growth. **`npm run verify`** asserts it.
+  `optional_permissions`) in `manifest.config.ts`, **and** update the matching array
+  in `scripts/expected-manifest.config.mjs`. A mismatch makes `verify:manifest` fail
+  by design — that failure is the guard against silent privilege growth. Surface,
+  content-script, and web-accessible-resource expectations live in the same file;
+  do not modify the generic engine for a product-specific manifest shape.
+  **`npm run verify`** asserts it.
 
 ## Forbidden changes
 
 Do not make these without explicit owner sign-off. Most are enforced by
 `scripts/verify-manifest.mjs`, which fails the build on violation:
 
-- Adding a manifest `permission` / `host_permission` without updating the
-  `verify-manifest.mjs` allowlist (and without a reason to hold the new privilege).
+- Adding a manifest `permission` / `host_permission` without updating the matching
+  array in `scripts/expected-manifest.config.mjs` (and without a reason to hold the
+  new privilege).
 - Adding an external runtime dependency to `src/lib/` — the messaging and storage
   layers are dependency-free by design; keep them so.
-- Relaxing the CSP. `verify:manifest` pins
-  `content_security_policy.extension_pages` to `script-src 'self'; object-src 'self';`.
-- Declaring `externally_connectable` — `verify:manifest` rejects it outright.
+- Relaxing the CSP. The generic engine pins
+  `content_security_policy.extension_pages` to `script-src 'self'; object-src 'self';`;
+  `expected-manifest.config.mjs` cannot override it.
+- Declaring `externally_connectable` — the generic engine rejects it outright, and
+  `expected-manifest.config.mjs` cannot permit it.
 
 ## Conventions
 
