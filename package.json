@@ -1,5 +1,6 @@
 {
   "name": "crx-vite-ts-react-template",
+  "displayName": "CRX Vite TS React Template",
   "version": "1.0.0",
   "description": "Chrome extension template using Vite, TypeScript and React",
   "main": "index.js",

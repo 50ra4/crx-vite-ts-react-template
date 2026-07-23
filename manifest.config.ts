@@ -1,13 +1,10 @@
 import { defineManifest } from '@crxjs/vite-plugin';
-import { name, version } from './package.json';
+import { displayName, version } from './package.json';
+import { createExtensionNames } from './scripts/extension-name.mjs';
 import { createManifestVersion } from './scripts/manifest-version.mjs';
 
 const manifestVersion = createManifestVersion(version);
-
-const EXTENSION_NAMES = {
-  build: name,
-  serve: `[DEV] ${name}`,
-} as const;
+const EXTENSION_NAMES = createExtensionNames(displayName);
 
 const createIconFileSuffix = (command: 'build' | 'serve') =>
   command === 'serve' ? '-dev' : '';
