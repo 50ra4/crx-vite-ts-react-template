@@ -34,7 +34,7 @@ export default defineManifest(({ command }) => ({
       }
     : {}),
   // Declare only permissions for Chrome APIs that the extension actually uses.
-  // Keep the allowlists in scripts/verify-manifest.mjs in sync when adding one.
+  // Keep scripts/expected-manifest.config.mjs in sync when adding one.
   permissions: ['storage'],
   content_scripts: [
     {
