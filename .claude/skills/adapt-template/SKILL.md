@@ -5,9 +5,12 @@ description: Turn this template into a real Chrome extension project. Use when s
 
 Checklist:
 
-- **`package.json`**: update `name`, `description`, `repository`, `bugs`,
-  `homepage`, `author`. `manifest.config.ts` derives the extension `name`
-  and `version` from here, so this is enough to rename the built extension.
+- **`package.json`**: update `name` (the kebab-case npm package identifier),
+  `displayName` (the human-readable Chrome product name), `description`,
+  `repository`, `bugs`, `homepage`, `author`. `manifest.config.ts` derives the
+  extension `name` from `displayName` and its version from `version`.
+  `npm run verify:manifest` warns while `displayName` still has the template
+  default.
 - **`manifest.config.ts`**: fill in `description` (currently empty), review
   `permissions` (currently just `['background']`), and review
   `content_scripts[].matches` — the template ships with a sample match on

@@ -101,10 +101,11 @@ unpacked 読み込みして確認できます。
 | Content script | `src/entrypoints/content/sample.tsx`       | `https://example.com/*` に注入(`manifest.config.ts` 参照)。               |
 
 manifest は手書きではなく、[`manifest.config.ts`](../manifest.config.ts) から
-`@crxjs/vite-plugin` がビルド時に生成します。dev モードでは拡張名に `[DEV]`
-接頭辞が付き、dev 用アイコンが使われるため、開発ビルドと本番インストールを
-共存させられます。`index.html` は popup / options へのリンクを持つ dev 専用の
-ランチャーページで、拡張本体には含まれません。
+`@crxjs/vite-plugin` がビルド時に生成します。Chrome の表示名は kebab-case の
+npm パッケージ `name` とは独立した `package.json` の `displayName` から取得します。
+dev モードでは表示名に `[DEV]` 接頭辞が付き、dev 用アイコンが使われるため、
+開発ビルドと本番インストールを共存させられます。`index.html` は popup / options
+へのリンクを持つ dev 専用のランチャーページで、拡張本体には含まれません。
 
 DevTools パネルのサーフェスは意図的に含めていません。必要な場合は
 [chrome.devtools 公式ドキュメント](https://developer.chrome.com/docs/extensions/reference/api/devtools)
@@ -183,8 +184,10 @@ src/
 1. `src/examples/` を丸ごと削除します。外部から import されていません。
 2. `src/entrypoints/` のサンプル UI(popup / options / content)と `greet`
    サンプルメッセージを自分の機能に置き換えます。
-3. `package.json`(name、description、repository)、`manifest.config.ts` の
-   説明、`public/logo/` のアイコンを更新します。
+3. `package.json` の npm パッケージ用 `name`、Chrome の人間可読な製品名用
+   `displayName`、description、repository を更新し、`manifest.config.ts` の
+   説明と `public/logo/` のアイコンも更新します。`displayName` がテンプレートの
+   既定値のままなら `npm run verify:manifest` が警告します。
 4. `manifest.config.ts` の content script `matches`(`https://example.com/*`)を
    変更または削除し、`scripts/verify-manifest.mjs` にも同じ変更を反映します
    (次節参照)。

@@ -7,8 +7,8 @@ MV3 facts specific to this repo:
 - `src/entrypoints/background/background.ts` is a service worker — no DOM, no `window`.
 - All manifest changes go through `manifest.config.ts` (`defineManifest`); never hand-edit a raw `manifest.json`.
 - Dev vs. build differ in `manifest.config.ts`: the extension name is prefixed
-  `[DEV] ${name}` when `command === 'serve'`, and icon filenames get a `-dev`
-  suffix (`createIconFileSuffix`).
+  `[DEV] ${displayName}` when `command === 'serve'`, and icon filenames get a
+  `-dev` suffix (`createIconFileSuffix`).
 - Stable package versions are copied to manifest `version`. For prereleases,
   manifest `version` uses the numeric SemVer core and `version_name` preserves
   the complete package version because Chrome rejects prerelease text in `version`.
