@@ -45,7 +45,10 @@ const createExpectedManifest = (overrides = {}) => ({
   optional_permissions: [],
   optional_host_permissions: [],
   surfaces: {
-    action: false,
+    action: {
+      present: false,
+      default_popup: false,
+    },
     options_ui: false,
     background: false,
   },
@@ -136,7 +139,10 @@ test('validates a content-script and background product from its expectation obj
   const expectedManifest = createExpectedManifest({
     permissions: ['storage'],
     surfaces: {
-      action: false,
+      action: {
+        present: false,
+        default_popup: false,
+      },
       options_ui: false,
       background: true,
     },
@@ -175,8 +181,32 @@ test('validates a popup-and-options-only product from its expectation object', a
   const expectedManifest = createExpectedManifest({
     permissions: ['activeTab', 'scripting', 'storage'],
     surfaces: {
-      action: true,
+      action: {
+        present: true,
+        default_popup: true,
+      },
       options_ui: true,
+      background: false,
+    },
+  });
+
+  await expect(verify(manifest, expectedManifest)).resolves.toEqual({
+    errors: [],
+    warnings: [],
+  });
+});
+
+test('validates an action surface without a default popup', async () => {
+  const manifest = createManifest({
+    action: {},
+  });
+  const expectedManifest = createExpectedManifest({
+    surfaces: {
+      action: {
+        present: true,
+        default_popup: false,
+      },
+      options_ui: false,
       background: false,
     },
   });
@@ -231,7 +261,10 @@ test('rejects a declared surface whose built artifact is missing', async () => {
   });
   const expectedManifest = createExpectedManifest({
     surfaces: {
-      action: true,
+      action: {
+        present: true,
+        default_popup: true,
+      },
       options_ui: false,
       background: false,
     },

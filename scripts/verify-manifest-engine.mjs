@@ -137,7 +137,45 @@ export const verifyManifest = async ({
   if (!isRecord(expectedSurfaces)) {
     errors.push('expectedManifest.surfaces must be an object.');
   } else {
-    for (const surface of ['action', 'options_ui', 'background']) {
+    const expectedAction = expectedSurfaces.action;
+    if (!isRecord(expectedAction)) {
+      errors.push('expectedManifest.surfaces.action must be an object.');
+    } else {
+      const { present, default_popup: defaultPopup } = expectedAction;
+      if (typeof present !== 'boolean') {
+        errors.push(
+          'expectedManifest.surfaces.action.present must be a boolean.',
+        );
+      }
+      if (typeof defaultPopup !== 'boolean') {
+        errors.push(
+          'expectedManifest.surfaces.action.default_popup must be a boolean.',
+        );
+      }
+      if (present === false && defaultPopup === true) {
+        errors.push(
+          'expectedManifest.surfaces.action.default_popup cannot be true when action.present is false.',
+        );
+      }
+
+      if (present === false) {
+        report(manifest.action === undefined, 'action must not be declared.');
+      } else if (present === true) {
+        report(isRecord(manifest.action), 'action must be declared.');
+        if (isRecord(manifest.action)) {
+          if (defaultPopup === true) {
+            addReference(manifest.action.default_popup, 'action.default_popup');
+          } else if (defaultPopup === false) {
+            report(
+              manifest.action.default_popup === undefined,
+              'action.default_popup must not be declared.',
+            );
+          }
+        }
+      }
+    }
+
+    for (const surface of ['options_ui', 'background']) {
       const expected = expectedSurfaces[surface];
       if (typeof expected !== 'boolean') {
         errors.push(`expectedManifest.surfaces.${surface} must be a boolean.`);
@@ -156,7 +194,6 @@ export const verifyManifest = async ({
       if (!isRecord(manifest[surface])) continue;
 
       const referenceFields = {
-        action: 'default_popup',
         options_ui: 'page',
         background: 'service_worker',
       };

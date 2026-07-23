@@ -7,7 +7,10 @@ export const expectedManifest = {
   optional_permissions: [],
   optional_host_permissions: [],
   surfaces: {
-    action: true,
+    action: {
+      present: true,
+      default_popup: true,
+    },
     options_ui: true,
     background: true,
   },
