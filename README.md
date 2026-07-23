@@ -105,8 +105,10 @@ and can be loaded unpacked the same way.
 
 The manifest is not written by hand: it is generated from
 [`manifest.config.ts`](./manifest.config.ts) by `@crxjs/vite-plugin` at
-build time. In dev mode the extension name gets a `[DEV]` prefix and the dev
-icon set is used, so a dev build and a production install can coexist.
+build time. The Chrome display name comes from `package.json`'s `displayName`,
+independently of the kebab-case npm package `name`. In dev mode the display
+name gets a `[DEV]` prefix and the dev icon set is used, so a dev build and a
+production install can coexist.
 `index.html` is a dev-only launcher page linking to the popup and options
 pages; it is not part of the extension.
 
@@ -187,8 +189,11 @@ The template separates reusable infrastructure (`src/lib/`) from sample code:
 1. Delete `src/examples/` entirely — nothing outside it imports from it.
 2. Replace the sample UI in `src/entrypoints/` (popup / options / content) and
    the `greet` sample message with your own features.
-3. Update `package.json` (name, description, repository), the manifest
-   description in `manifest.config.ts`, and the icons in `public/logo/`.
+3. Update `package.json` (`name` for the npm package, `displayName` for the
+   human-readable Chrome product name, plus description and repository), the
+   manifest description in `manifest.config.ts`, and the icons in
+   `public/logo/`. `npm run verify:manifest` warns while `displayName` still
+   has the template default.
 4. Adjust or remove the content script `matches` (`https://example.com/*`) in
    `manifest.config.ts` — and mirror the change in
    `scripts/verify-manifest.mjs` (see below).

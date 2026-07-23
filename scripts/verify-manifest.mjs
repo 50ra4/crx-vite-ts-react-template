@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { validateExtensionDisplayName } from './extension-name.mjs';
 import { createManifestVersion } from './manifest-version.mjs';
 
 const EXPECTED_CSP = "script-src 'self'; object-src 'self';";
@@ -17,6 +18,7 @@ const extensionDirectory = fileURLToPath(
 const manifestPath = resolve(extensionDirectory, 'manifest.json');
 const packagePath = fileURLToPath(new URL('../package.json', import.meta.url));
 const errors = [];
+const warnings = [];
 const references = [];
 
 const isRecord = (value) =>
@@ -96,6 +98,12 @@ if (!isRecord(packageJson) || typeof packageJson.version !== 'string') {
 }
 
 const expectedManifestVersion = createManifestVersion(packageJson.version);
+const extensionDisplayNameValidation = validateExtensionDisplayName({
+  displayName: packageJson.displayName,
+  manifestName: manifest.name,
+});
+errors.push(...extensionDisplayNameValidation.errors);
+warnings.push(...extensionDisplayNameValidation.warnings);
 
 report(
   manifest.version === expectedManifestVersion.version,
@@ -241,6 +249,12 @@ const verifyReference = async ({ field, value }) => {
 
 const referenceErrors = await Promise.all(references.map(verifyReference));
 errors.push(...referenceErrors.filter(Boolean));
+
+if (warnings.length > 0) {
+  console.warn(
+    `Manifest verification warnings:\n${warnings.map((warning) => `- ${warning}`).join('\n')}`,
+  );
+}
 
 if (errors.length > 0) {
   console.error(
