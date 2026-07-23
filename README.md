@@ -196,7 +196,8 @@ The template separates reusable infrastructure (`src/lib/`) from sample code:
    has the template default.
 4. Adjust or remove the content script `matches` (`https://example.com/*`) in
    `manifest.config.ts` — and mirror the change in
-   `scripts/verify-manifest.mjs` (see below).
+   `scripts/expected-manifest.config.mjs` (see below). The same expectation file
+   declares which extension surfaces and web-accessible resources must be present.
 
 `.claude/skills/adapt-template/SKILL.md` contains the full checklist.
 
@@ -206,14 +207,15 @@ Permissions are guarded against silent growth:
 
 1. Add the permission to `permissions` (or `host_permissions` /
    `optional_permissions`) in `manifest.config.ts`.
-2. Update the matching allowlist (`EXPECTED_PERMISSIONS`,
-   `EXPECTED_HOST_PERMISSIONS`, …) in `scripts/verify-manifest.mjs`.
+2. Update the matching array (`permissions`, `host_permissions`, …) in
+   `scripts/expected-manifest.config.mjs`.
 3. Run `npm run verify` — a mismatch between the built manifest and the
-   allowlists fails `verify:manifest` **by design**, so every privilege change
+   expectations fails `verify:manifest` **by design**, so every privilege change
    shows up as a reviewable diff.
 
-The same script pins the CSP to `script-src 'self'; object-src 'self';` and
-rejects `externally_connectable`.
+The generic verification engine pins the CSP to
+`script-src 'self'; object-src 'self';` and rejects `externally_connectable`;
+the expectation file cannot relax either invariant.
 
 ## Packaging and release
 

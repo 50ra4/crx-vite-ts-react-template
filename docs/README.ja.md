@@ -189,8 +189,9 @@ src/
    説明と `public/logo/` のアイコンも更新します。`displayName` がテンプレートの
    既定値のままなら `npm run verify:manifest` が警告します。
 4. `manifest.config.ts` の content script `matches`(`https://example.com/*`)を
-   変更または削除し、`scripts/verify-manifest.mjs` にも同じ変更を反映します
-   (次節参照)。
+   変更または削除し、`scripts/expected-manifest.config.mjs` にも同じ変更を
+   反映します(次節参照)。同じ期待値ファイルで、必要な拡張機能サーフェスと
+   web accessible resources も宣言します。
 
 完全なチェックリストは `.claude/skills/adapt-template/SKILL.md` にあります。
 
@@ -200,14 +201,15 @@ src/
 
 1. `manifest.config.ts` の `permissions`(または `host_permissions` /
    `optional_permissions`)に権限を追加します。
-2. `scripts/verify-manifest.mjs` の対応する許可リスト
-   (`EXPECTED_PERMISSIONS`、`EXPECTED_HOST_PERMISSIONS` など)を更新します。
-3. `npm run verify` を実行します。ビルド成果物の manifest と許可リストの不一致で
+2. `scripts/expected-manifest.config.mjs` の対応する配列
+   (`permissions`、`host_permissions` など)を更新します。
+3. `npm run verify` を実行します。ビルド成果物の manifest と期待値の不一致で
    `verify:manifest` が失敗するのは**仕様**であり、すべての権限変更が
    レビュー可能な diff として現れます。
 
-同スクリプトは CSP を `script-src 'self'; object-src 'self';` に固定し、
-`externally_connectable` の宣言を拒否します。
+汎用検証エンジンは CSP を `script-src 'self'; object-src 'self';` に固定し、
+`externally_connectable` の宣言を拒否します。期待値ファイルからこの不変条件を
+緩和することはできません。
 
 ## Packaging and release
 
