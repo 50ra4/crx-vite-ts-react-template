@@ -1,5 +1,5 @@
 ---
-paths: ['**/*.test.{mjs,ts,tsx}']
+paths: ['**/*.test.{mjs,ts,tsx}', 'e2e/**/*.ts']
 ---
 
 Vitest + jsdom (`src/**/*.test.{ts,tsx}`) or Node (`scripts/**/*.test.mjs` with
@@ -19,3 +19,16 @@ Vitest + jsdom (`src/**/*.test.{ts,tsx}`) or Node (`scripts/**/*.test.mjs` with
   mocks in individual test files.
 - Because `installChromeFake` injects the global with `vi.stubGlobal`, call
   `vi.unstubAllGlobals()` in `afterEach`.
+- E2E tests run against the built extension with `npm run e2e`; use
+  `npm run verify:full` to build first and run the complete verification chain.
+- Configure E2E surface variants from the spec with
+  `test.use({ extensionOptions: { manifest: { remove, set }, contextOptions } })`.
+  Do not edit `e2e/fixtures.ts` for each derived product.
+- `extensionOptions.manifest.remove` deletes top-level manifest fields and
+  `extensionOptions.manifest.set` replaces them. Use `contextOptions` for
+  Playwright settings such as `timezoneId`.
+- Test content scripts at their production URL and intercept the response with
+  `extensionPage.route()`. Do not rewrite manifest match patterns or create a
+  local HTTP server solely for E2E.
+- Extension ID resolution is independent of service workers. Do not add a dummy
+  background worker to make Playwright fixtures start.

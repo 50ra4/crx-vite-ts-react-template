@@ -1,4 +1,4 @@
-import { createServer, type Server } from 'node:http';
+import { createHash } from 'node:crypto';
 import { access, cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -11,40 +11,71 @@ import {
   type Page,
 } from '@playwright/test';
 
-const PRODUCTION_CONTENT_MATCH = 'https://example.com/*';
-const E2E_CONTENT_MATCH = 'http://127.0.0.1/*';
+const E2E_EXTENSION_KEY =
+  'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnlJy17+s4cRAMFlCbRTU6FAexIDBc+qXqUYu+aYKe6EXMFSFGyzggYn27xShGmpYYgC4lqxt90NRqmc+Vn8rMifwWHVuIdJ+MlpJf3niCXZWvIvaFqsvItXdrxTLFU9BZQYNZOmmgopqD3o6GgF2EqCZE5jjMfAw3iozBU5UT1driPC0pNcxP16GmJF0e6kcOIDZO2JTVyzSlfKlzs6NHj8yFu/8/MEIpW1/ZilcHW8kCPxAMpF66/+p9pJD8ztZ9xmuZaKStmD1oyucYeafbVekBbIhyTqaiZDsdda4urCifMT/lswtcmjPgV9XcMqkBF0Qn7rQEhw5xpkivLR8UwIDAQAB';
+
+type PersistentContextOptions = NonNullable<
+  Parameters<typeof chromium.launchPersistentContext>[1]
+>;
+
+export type ManifestPatch = {
+  remove?: readonly string[];
+  set?: Readonly<Record<string, unknown>>;
+};
+
+export type ExtensionOptions = {
+  contextOptions?: Omit<
+    PersistentContextOptions,
+    'args' | 'channel' | 'headless'
+  >;
+  manifest?: ManifestPatch;
+};
 
 type TestFixtures = {
+  extensionContext: BrowserContext;
+  extensionId: string;
+  extensionOptions: ExtensionOptions;
   extensionPage: Page;
 };
 
-type WorkerFixtures = {
-  extensionContext: BrowserContext;
-  extensionId: string;
-  testPageUrl: string;
-};
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const replaceContentMatches = (entries: unknown): number => {
-  if (!Array.isArray(entries)) return 0;
-
-  let replacementCount = 0;
-  for (const entry of entries) {
-    if (!isRecord(entry) || !Array.isArray(entry.matches)) continue;
-
-    entry.matches = entry.matches.map((match) => {
-      if (match !== PRODUCTION_CONTENT_MATCH) return match;
-      replacementCount += 1;
-      return E2E_CONTENT_MATCH;
-    });
+export const patchManifest = (
+  manifest: unknown,
+  patch: ManifestPatch = {},
+): Record<string, unknown> => {
+  if (!isRecord(manifest)) {
+    throw new Error('Built extension manifest must be an object.');
   }
 
-  return replacementCount;
+  const patchedManifest = { ...manifest };
+  for (const field of patch.remove ?? []) {
+    delete patchedManifest[field];
+  }
+
+  return {
+    ...patchedManifest,
+    ...patch.set,
+  };
 };
 
-const prepareExtension = async (): Promise<{
+const createExtensionId = (manifestKey: string): string => {
+  const hashPrefix = createHash('sha256')
+    .update(Buffer.from(manifestKey, 'base64'))
+    .digest('hex')
+    .slice(0, 32);
+
+  return hashPrefix.replace(/[0-9a-f]/gu, (digit) =>
+    String.fromCharCode('a'.charCodeAt(0) + Number.parseInt(digit, 16)),
+  );
+};
+
+const E2E_EXTENSION_ID = createExtensionId(E2E_EXTENSION_KEY);
+
+const prepareExtension = async (
+  manifestPatch: ManifestPatch | undefined,
+): Promise<{
   extensionPath: string;
   temporaryDirectory: string;
 }> => {
@@ -69,37 +100,12 @@ const prepareExtension = async (): Promise<{
     const parsedManifest: unknown = JSON.parse(
       await readFile(manifestPath, 'utf8'),
     );
-    if (!isRecord(parsedManifest)) {
-      throw new Error('Built extension manifest must be an object.');
-    }
+    const patchedManifest = patchManifest(parsedManifest, manifestPatch);
+    patchedManifest.key = E2E_EXTENSION_KEY;
 
-    if (
-      !isRecord(parsedManifest.background) ||
-      typeof parsedManifest.background.service_worker !== 'string'
-    ) {
-      throw new Error('Built extension has no background service worker.');
-    }
-
-    const contentScriptMatches = replaceContentMatches(
-      parsedManifest.content_scripts,
-    );
-    if (contentScriptMatches === 0) {
-      throw new Error(
-        `Built extension has no content script matching ${PRODUCTION_CONTENT_MATCH}.`,
-      );
-    }
-
-    const webAccessibleResourceMatches = replaceContentMatches(
-      parsedManifest.web_accessible_resources,
-    );
-    if (webAccessibleResourceMatches === 0) {
-      throw new Error(
-        `Built extension has no web_accessible_resources matching ${PRODUCTION_CONTENT_MATCH}.`,
-      );
-    }
     await writeFile(
       manifestPath,
-      `${JSON.stringify(parsedManifest, null, 2)}\n`,
+      `${JSON.stringify(patchedManifest, null, 2)}\n`,
       'utf8',
     );
 
@@ -110,92 +116,41 @@ const prepareExtension = async (): Promise<{
   }
 };
 
-const closeServer = (server: Server): Promise<void> =>
-  new Promise((resolvePromise, rejectPromise) => {
-    server.close((error) => {
-      if (error) rejectPromise(error);
-      else resolvePromise();
-    });
-    server.closeAllConnections();
-  });
+export const test = base.extend<TestFixtures>({
+  extensionOptions: [{}, { option: true }],
 
-export const test = base.extend<TestFixtures, WorkerFixtures>({
-  extensionContext: [
+  extensionContext: async ({ extensionOptions }, provide) => {
+    const { extensionPath, temporaryDirectory } = await prepareExtension(
+      extensionOptions.manifest,
+    );
+    let context: BrowserContext | undefined;
+
+    try {
+      context = await chromium.launchPersistentContext(
+        join(temporaryDirectory, 'user-data'),
+        {
+          ...extensionOptions.contextOptions,
+          channel: 'chromium',
+          headless: true,
+          args: [
+            `--disable-extensions-except=${extensionPath}`,
+            `--load-extension=${extensionPath}`,
+          ],
+        },
+      );
+      await provide(context);
+    } finally {
+      await context?.close();
+      await rm(temporaryDirectory, { recursive: true, force: true });
+    }
+  },
+
+  extensionId:
     // Playwright requires the fixture dependency argument to use object destructuring.
     // oxlint-disable-next-line no-empty-pattern
     async ({}, provide) => {
-      const { extensionPath, temporaryDirectory } = await prepareExtension();
-      let context: BrowserContext | undefined;
-
-      try {
-        context = await chromium.launchPersistentContext(
-          join(temporaryDirectory, 'user-data'),
-          {
-            channel: 'chromium',
-            headless: true,
-            args: [
-              `--disable-extensions-except=${extensionPath}`,
-              `--load-extension=${extensionPath}`,
-            ],
-          },
-        );
-        await provide(context);
-      } finally {
-        await context?.close();
-        await rm(temporaryDirectory, { recursive: true, force: true });
-      }
+      await provide(E2E_EXTENSION_ID);
     },
-    { scope: 'worker' },
-  ],
-
-  extensionId: [
-    async ({ extensionContext }, provide) => {
-      let serviceWorker = extensionContext
-        .serviceWorkers()
-        .find((worker) => worker.url().startsWith('chrome-extension://'));
-
-      serviceWorker ??= await extensionContext.waitForEvent('serviceworker', {
-        predicate: (worker) => worker.url().startsWith('chrome-extension://'),
-      });
-
-      await provide(new URL(serviceWorker.url()).host);
-    },
-    { scope: 'worker' },
-  ],
-
-  testPageUrl: [
-    // Playwright requires the fixture dependency argument to use object destructuring.
-    // oxlint-disable-next-line no-empty-pattern
-    async ({}, provide) => {
-      const server = createServer((_request, response) => {
-        response.writeHead(200, {
-          Connection: 'close',
-          'Content-Type': 'text/html; charset=utf-8',
-        });
-        response.end(
-          '<!doctype html><html><body><main>E2E fixture page</main></body></html>',
-        );
-      });
-
-      await new Promise<void>((resolvePromise, rejectPromise) => {
-        server.once('error', rejectPromise);
-        server.listen(0, '127.0.0.1', resolvePromise);
-      });
-
-      const address = server.address();
-      if (!address || typeof address === 'string') {
-        await closeServer(server);
-        throw new Error('Failed to resolve the local E2E server address.');
-      }
-
-      try {
-        await provide(`http://127.0.0.1:${address.port}/`);
-      } finally {
-        await closeServer(server);
-      }
-    },
-    { scope: 'worker' },
-  ],
 
   extensionPage: async ({ extensionContext }, provide) => {
     const page = await extensionContext.newPage();
