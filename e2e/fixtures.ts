@@ -11,8 +11,12 @@ import {
   type Page,
 } from '@playwright/test';
 
+// Test-only RSA public key generated for this fixture. Chrome uses it to assign
+// a stable unpacked-extension ID; it is public material and needs no secret key.
 const E2E_EXTENSION_KEY =
   'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnlJy17+s4cRAMFlCbRTU6FAexIDBc+qXqUYu+aYKe6EXMFSFGyzggYn27xShGmpYYgC4lqxt90NRqmc+Vn8rMifwWHVuIdJ+MlpJf3niCXZWvIvaFqsvItXdrxTLFU9BZQYNZOmmgopqD3o6GgF2EqCZE5jjMfAw3iozBU5UT1driPC0pNcxP16GmJF0e6kcOIDZO2JTVyzSlfKlzs6NHj8yFu/8/MEIpW1/ZilcHW8kCPxAMpF66/+p9pJD8ztZ9xmuZaKStmD1oyucYeafbVekBbIhyTqaiZDsdda4urCifMT/lswtcmjPgV9XcMqkBF0Qn7rQEhw5xpkivLR8UwIDAQAB';
+const E2E_RESERVED_MANIFEST_FIELD = 'key';
+const EXTENSION_LOAD_TIMEOUT_MS = 5_000;
 
 type PersistentContextOptions = NonNullable<
   Parameters<typeof chromium.launchPersistentContext>[1]
@@ -49,8 +53,35 @@ export const patchManifest = (
     throw new Error('Built extension manifest must be an object.');
   }
 
+  const removeFields = patch.remove ?? [];
+  const setFields = new Set(Object.keys(patch.set ?? {}));
+  if (
+    removeFields.includes(E2E_RESERVED_MANIFEST_FIELD) ||
+    setFields.has(E2E_RESERVED_MANIFEST_FIELD)
+  ) {
+    throw new Error(
+      `Manifest field "${E2E_RESERVED_MANIFEST_FIELD}" is reserved by the E2E fixture.`,
+    );
+  }
+
   const patchedManifest = { ...manifest };
-  for (const field of patch.remove ?? []) {
+  const removedFields = new Set<string>();
+  for (const field of removeFields) {
+    if (removedFields.has(field)) {
+      throw new Error(
+        `Manifest field "${field}" is listed more than once in remove.`,
+      );
+    }
+    if (setFields.has(field)) {
+      throw new Error(
+        `Manifest field "${field}" cannot be configured by both remove and set.`,
+      );
+    }
+    if (!Object.hasOwn(patchedManifest, field)) {
+      throw new Error(`Manifest has no top-level field "${field}" to remove.`);
+    }
+
+    removedFields.add(field);
     delete patchedManifest[field];
   }
 
@@ -60,7 +91,9 @@ export const patchManifest = (
   };
 };
 
-const createExtensionId = (manifestKey: string): string => {
+// Chrome hashes the public key, takes the first 16 bytes, then maps each hex
+// digit 0-f to a-p to form the 32-character extension ID.
+export const createExtensionId = (manifestKey: string): string => {
   const hashPrefix = createHash('sha256')
     .update(Buffer.from(manifestKey, 'base64'))
     .digest('hex')
@@ -72,6 +105,32 @@ const createExtensionId = (manifestKey: string): string => {
 };
 
 const E2E_EXTENSION_ID = createExtensionId(E2E_EXTENSION_KEY);
+
+const verifyExtensionLoaded = async (
+  context: BrowserContext,
+  extensionId: string,
+): Promise<void> => {
+  const probePage = await context.newPage();
+
+  try {
+    await expect(async () => {
+      const response = await probePage.goto(
+        `chrome-extension://${extensionId}/manifest.json`,
+      );
+      expect(response?.ok()).toBe(true);
+    }).toPass({
+      intervals: [100, 250, 500],
+      timeout: EXTENSION_LOAD_TIMEOUT_MS,
+    });
+  } catch (cause: unknown) {
+    throw new Error(
+      `Extension failed to load (id=${extensionId}). Check extensionOptions.manifest.`,
+      { cause },
+    );
+  } finally {
+    await probePage.close();
+  }
+};
 
 const prepareExtension = async (
   manifestPatch: ManifestPatch | undefined,
@@ -119,7 +178,7 @@ const prepareExtension = async (
 export const test = base.extend<TestFixtures>({
   extensionOptions: [{}, { option: true }],
 
-  extensionContext: async ({ extensionOptions }, provide) => {
+  extensionContext: async ({ extensionId, extensionOptions }, provide) => {
     const { extensionPath, temporaryDirectory } = await prepareExtension(
       extensionOptions.manifest,
     );
@@ -138,6 +197,7 @@ export const test = base.extend<TestFixtures>({
           ],
         },
       );
+      await verifyExtensionLoaded(context, extensionId);
       await provide(context);
     } finally {
       await context?.close();
@@ -145,12 +205,7 @@ export const test = base.extend<TestFixtures>({
     }
   },
 
-  extensionId:
-    // Playwright requires the fixture dependency argument to use object destructuring.
-    // oxlint-disable-next-line no-empty-pattern
-    async ({}, provide) => {
-      await provide(E2E_EXTENSION_ID);
-    },
+  extensionId: [E2E_EXTENSION_ID, { option: true }],
 
   extensionPage: async ({ extensionContext }, provide) => {
     const page = await extensionContext.newPage();

@@ -28,8 +28,10 @@
   "overrides": [
     {
       // Keep runtime Chrome API access behind thin src/lib boundaries. Type-only
-      // references through the chrome namespace remain available throughout the project.
-      "files": ["src/**/*.{ts,tsx}"],
+      // references through the chrome namespace remain available throughout the
+      // project; E2E callbacks that execute inside an extension page need an
+      // explicit, reasoned disable at the call site.
+      "files": ["src/**/*.{ts,tsx}", "e2e/**/*.{ts,tsx}"],
       "excludeFiles": ["src/lib/**/*.{ts,tsx}"],
       "rules": {
         "no-restricted-globals": [

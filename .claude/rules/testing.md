@@ -26,9 +26,19 @@ Vitest + jsdom (`src/**/*.test.{ts,tsx}`) or Node (`scripts/**/*.test.mjs` with
   Do not edit `e2e/fixtures.ts` for each derived product.
 - `extensionOptions.manifest.remove` deletes top-level manifest fields and
   `extensionOptions.manifest.set` replaces them. Use `contextOptions` for
-  Playwright settings such as `timezoneId`.
+  Playwright settings such as `timezoneId`. The fixture rejects missing removal
+  targets, remove/set conflicts, and attempts to configure its reserved `key`.
 - Test content scripts at their production URL and intercept the response with
   `extensionPage.route()`. Do not rewrite manifest match patterns or create a
-  local HTTP server solely for E2E.
+  local HTTP server solely for E2E. When changing `content_scripts[].matches`,
+  update the production URL and host-permission values in the E2E spec so the
+  intercepted URL remains covered by the manifest.
 - Extension ID resolution is independent of service workers. Do not add a dummy
-  background worker to make Playwright fixtures start.
+  background worker to make Playwright fixtures start. The fixture probes the
+  extension origin before exposing the context and reports invalid manifest
+  patches as extension-load failures.
+- `extensionOptions` and the persistent context are test-scoped so describe-level
+  `test.use()` can model multiple surface variants in one spec. Each test that
+  requests the context launches Chromium; group related assertions into one test.
+  If startup cost becomes material, split variants into spec files or Playwright
+  projects and move their configuration to worker scope.

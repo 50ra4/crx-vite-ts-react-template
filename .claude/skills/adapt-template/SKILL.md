@@ -12,9 +12,11 @@ Checklist:
   `npm run verify:manifest` warns while `displayName` still has the template
   default.
 - **`manifest.config.ts`**: fill in `description` (currently empty), review
-  `permissions` (currently just `['background']`), and review
+  `permissions` (currently just `['storage']`), and review
   `content_scripts[].matches` — the template ships with a sample match on
-  `https://example.com/*`.
+  `https://example.com/*`. When changing that match, update the production URL
+  and host-permission values in `e2e/extension.spec.ts` so its intercepted page
+  is still covered.
 - **Delete or replace sample code**: `src/examples/` collects everything
   disposable — delete the whole directory in one shot, or replace pieces
   individually:

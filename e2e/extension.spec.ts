@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 
-import { expect, test } from './fixtures';
+import { createExtensionId, expect, patchManifest, test } from './fixtures';
 
 const PRODUCTION_PAGE_URL = 'https://example.com/e2e-fixture';
 const EXTENSION_ORIGIN = 'chrome-extension://';
@@ -19,8 +19,84 @@ const routeProductionPage = async (page: Page): Promise<void> => {
   });
 };
 
+test.describe('manifest patch configuration', () => {
+  test('applies explicit removals and replacements', () => {
+    expect(
+      patchManifest(
+        {
+          action: {},
+          background: {},
+        },
+        {
+          remove: ['background'],
+          set: {
+            host_permissions: [E2E_HOST_PERMISSION],
+          },
+        },
+      ),
+    ).toEqual({
+      action: {},
+      host_permissions: [E2E_HOST_PERMISSION],
+    });
+  });
+
+  test('rejects a missing removal target', () => {
+    expect(() =>
+      patchManifest(
+        {
+          background: {},
+        },
+        {
+          remove: ['options_ui'],
+        },
+      ),
+    ).toThrow('Manifest has no top-level field "options_ui" to remove.');
+  });
+
+  test('rejects fields configured by both remove and set', () => {
+    expect(() =>
+      patchManifest(
+        {
+          background: {},
+        },
+        {
+          remove: ['background'],
+          set: {
+            background: {
+              service_worker: 'replacement.js',
+            },
+          },
+        },
+      ),
+    ).toThrow(
+      'Manifest field "background" cannot be configured by both remove and set.',
+    );
+  });
+
+  test('rejects overriding the fixture-owned extension key', () => {
+    expect(() =>
+      patchManifest(
+        {
+          name: 'extension',
+        },
+        {
+          set: {
+            key: 'another-key',
+          },
+        },
+      ),
+    ).toThrow('Manifest field "key" is reserved by the E2E fixture.');
+  });
+
+  test('derives the Chrome extension ID from a manifest public key', () => {
+    expect(createExtensionId('dGVzdC1rZXk=')).toBe(
+      'gckpihaehgepkpiokicpmgbmojmemdja',
+    );
+  });
+});
+
 test.describe('default sample configuration', () => {
-  test('popup exchanges a typed message with the background', async ({
+  test('supports popup messaging and production-URL content injection', async ({
     extensionId,
     extensionPage,
   }) => {
@@ -28,11 +104,6 @@ test.describe('default sample configuration', () => {
     await extensionPage.getByRole('button', { name: 'send message' }).click();
 
     await expect(extensionPage.getByText('Hello, popup!')).toBeVisible();
-  });
-
-  test('content script is injected at its production URL', async ({
-    extensionPage,
-  }) => {
     await routeProductionPage(extensionPage);
     await extensionPage.goto(PRODUCTION_PAGE_URL);
 
@@ -130,7 +201,10 @@ test.describe('popup and options configuration', () => {
       extensionPage.getByRole('heading', { name: 'Options' }),
     ).toBeVisible();
     expect(
-      await extensionPage.evaluate(() => chrome.runtime.getManifest()),
+      await extensionPage.evaluate(() => {
+        // oxlint-disable-next-line no-restricted-globals -- This callback runs inside the extension page and verifies its effective manifest.
+        return chrome.runtime.getManifest();
+      }),
     ).toMatchObject({
       host_permissions: [E2E_HOST_PERMISSION],
     });
