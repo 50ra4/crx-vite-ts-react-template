@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { access, cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -11,27 +10,28 @@ import {
   type Page,
 } from '@playwright/test';
 
+import {
+  createExtensionId,
+  patchManifest,
+  type ManifestPatch,
+} from './manifest';
+
 // Test-only RSA public key generated for this fixture. Chrome uses it to assign
 // a stable unpacked-extension ID; it is public material and needs no secret key.
 const E2E_EXTENSION_KEY =
   'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnlJy17+s4cRAMFlCbRTU6FAexIDBc+qXqUYu+aYKe6EXMFSFGyzggYn27xShGmpYYgC4lqxt90NRqmc+Vn8rMifwWHVuIdJ+MlpJf3niCXZWvIvaFqsvItXdrxTLFU9BZQYNZOmmgopqD3o6GgF2EqCZE5jjMfAw3iozBU5UT1driPC0pNcxP16GmJF0e6kcOIDZO2JTVyzSlfKlzs6NHj8yFu/8/MEIpW1/ZilcHW8kCPxAMpF66/+p9pJD8ztZ9xmuZaKStmD1oyucYeafbVekBbIhyTqaiZDsdda4urCifMT/lswtcmjPgV9XcMqkBF0Qn7rQEhw5xpkivLR8UwIDAQAB';
-const E2E_RESERVED_MANIFEST_FIELD = 'key';
-const EXTENSION_LOAD_TIMEOUT_MS = 5_000;
+const DEFAULT_EXTENSION_LOAD_TIMEOUT_MS = 5_000;
 
 type PersistentContextOptions = NonNullable<
   Parameters<typeof chromium.launchPersistentContext>[1]
 >;
-
-export type ManifestPatch = {
-  remove?: readonly string[];
-  set?: Readonly<Record<string, unknown>>;
-};
 
 export type ExtensionOptions = {
   contextOptions?: Omit<
     PersistentContextOptions,
     'args' | 'channel' | 'headless'
   >;
+  loadTimeoutMs?: number;
   manifest?: ManifestPatch;
 };
 
@@ -42,73 +42,12 @@ type TestFixtures = {
   extensionPage: Page;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-export const patchManifest = (
-  manifest: unknown,
-  patch: ManifestPatch = {},
-): Record<string, unknown> => {
-  if (!isRecord(manifest)) {
-    throw new Error('Built extension manifest must be an object.');
-  }
-
-  const removeFields = patch.remove ?? [];
-  const setFields = new Set(Object.keys(patch.set ?? {}));
-  if (
-    removeFields.includes(E2E_RESERVED_MANIFEST_FIELD) ||
-    setFields.has(E2E_RESERVED_MANIFEST_FIELD)
-  ) {
-    throw new Error(
-      `Manifest field "${E2E_RESERVED_MANIFEST_FIELD}" is reserved by the E2E fixture.`,
-    );
-  }
-
-  const patchedManifest = { ...manifest };
-  const removedFields = new Set<string>();
-  for (const field of removeFields) {
-    if (removedFields.has(field)) {
-      throw new Error(
-        `Manifest field "${field}" is listed more than once in remove.`,
-      );
-    }
-    if (setFields.has(field)) {
-      throw new Error(
-        `Manifest field "${field}" cannot be configured by both remove and set.`,
-      );
-    }
-    if (!Object.hasOwn(patchedManifest, field)) {
-      throw new Error(`Manifest has no top-level field "${field}" to remove.`);
-    }
-
-    removedFields.add(field);
-    delete patchedManifest[field];
-  }
-
-  return {
-    ...patchedManifest,
-    ...patch.set,
-  };
-};
-
-// Chrome hashes the public key, takes the first 16 bytes, then maps each hex
-// digit 0-f to a-p to form the 32-character extension ID.
-export const createExtensionId = (manifestKey: string): string => {
-  const hashPrefix = createHash('sha256')
-    .update(Buffer.from(manifestKey, 'base64'))
-    .digest('hex')
-    .slice(0, 32);
-
-  return hashPrefix.replace(/[0-9a-f]/gu, (digit) =>
-    String.fromCharCode('a'.charCodeAt(0) + Number.parseInt(digit, 16)),
-  );
-};
-
 const E2E_EXTENSION_ID = createExtensionId(E2E_EXTENSION_KEY);
 
 const verifyExtensionLoaded = async (
   context: BrowserContext,
   extensionId: string,
+  timeout: number,
 ): Promise<void> => {
   const probePage = await context.newPage();
 
@@ -120,7 +59,7 @@ const verifyExtensionLoaded = async (
       expect(response?.ok()).toBe(true);
     }).toPass({
       intervals: [100, 250, 500],
-      timeout: EXTENSION_LOAD_TIMEOUT_MS,
+      timeout,
     });
   } catch (cause: unknown) {
     throw new Error(
@@ -197,7 +136,11 @@ export const test = base.extend<TestFixtures>({
           ],
         },
       );
-      await verifyExtensionLoaded(context, extensionId);
+      await verifyExtensionLoaded(
+        context,
+        extensionId,
+        extensionOptions.loadTimeoutMs ?? DEFAULT_EXTENSION_LOAD_TIMEOUT_MS,
+      );
       await provide(context);
     } finally {
       await context?.close();
@@ -205,7 +148,7 @@ export const test = base.extend<TestFixtures>({
     }
   },
 
-  extensionId: [E2E_EXTENSION_ID, { option: true }],
+  extensionId: E2E_EXTENSION_ID,
 
   extensionPage: async ({ extensionContext }, provide) => {
     const page = await extensionContext.newPage();
