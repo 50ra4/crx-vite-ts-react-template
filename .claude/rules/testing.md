@@ -2,8 +2,9 @@
 paths: ['**/*.test.{mjs,ts,tsx}', 'e2e/**/*.ts']
 ---
 
-Vitest + jsdom (`src/**/*.test.{ts,tsx}`) or Node (`scripts/**/*.test.mjs` with
-`// @vitest-environment node`).
+Vitest + jsdom (`src/**/*.test.{ts,tsx}`), Vitest + Node
+(`scripts/**/*.test.mjs` and `e2e/**/*.test.ts`, each with
+`// @vitest-environment node`), or Playwright (`e2e/**/*.spec.ts`).
 
 - Colocate tests as `*.test.ts(x)` next to the source file.
 - Components: `render`/`screen` from `@testing-library/react` (see `SampleComponent.test.tsx`).
@@ -38,9 +39,10 @@ Vitest + jsdom (`src/**/*.test.{ts,tsx}`) or Node (`scripts/**/*.test.mjs` with
   background worker to make Playwright fixtures start. The fixture probes the
   extension origin before exposing the context and reports invalid manifest
   patches as extension-load failures.
-- Pure E2E fixture logic lives in `e2e/*.test.ts` and runs in the fast Vitest
-  lane. Playwright is restricted to `e2e/*.spec.ts` so those tests are not run
-  twice.
+- Pure E2E fixture logic lives in `e2e/*.test.ts`, selects the Node environment
+  with `// @vitest-environment node`, and runs in the fast Vitest lane.
+  Playwright is restricted to `e2e/*.spec.ts` so those tests are not run twice.
+  Import the reusable `ManifestPatch` type from `e2e/fixtures.ts`.
 - `extensionOptions` and the persistent context are test-scoped so describe-level
   `test.use()` can model multiple surface variants in one spec. Each test that
   requests the context launches Chromium; group related assertions into one test.
