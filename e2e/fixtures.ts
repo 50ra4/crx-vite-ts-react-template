@@ -16,6 +16,8 @@ import {
   type ManifestPatch,
 } from './manifest';
 
+export type { ManifestPatch } from './manifest';
+
 // Test-only RSA public key generated for this fixture. Chrome uses it to assign
 // a stable unpacked-extension ID; it is public material and needs no secret key.
 const E2E_EXTENSION_KEY =
@@ -117,7 +119,7 @@ const prepareExtension = async (
 export const test = base.extend<TestFixtures>({
   extensionOptions: [{}, { option: true }],
 
-  extensionContext: async ({ extensionId, extensionOptions }, provide) => {
+  extensionContext: async ({ extensionOptions }, provide) => {
     const { extensionPath, temporaryDirectory } = await prepareExtension(
       extensionOptions.manifest,
     );
@@ -138,7 +140,9 @@ export const test = base.extend<TestFixtures>({
       );
       await verifyExtensionLoaded(
         context,
-        extensionId,
+        // Readiness follows the fixture-owned manifest key even if a test
+        // overrides the separately exposed extensionId value.
+        E2E_EXTENSION_ID,
         extensionOptions.loadTimeoutMs ?? DEFAULT_EXTENSION_LOAD_TIMEOUT_MS,
       );
       await provide(context);

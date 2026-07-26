@@ -5,6 +5,7 @@ import { expect, test } from './fixtures';
 const PRODUCTION_PAGE_URL = 'https://example.com/e2e-fixture';
 const EXTENSION_ORIGIN = 'chrome-extension://';
 const E2E_HOST_PERMISSION = 'https://example.com/*';
+const OVERRIDDEN_EXTENSION_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 const extensionPageUrl = (extensionId: string, path: string): string =>
   `${EXTENSION_ORIGIN}${extensionId}/${path}`;
@@ -34,6 +35,20 @@ test.describe('default sample configuration', () => {
     await expect(
       extensionPage.getByRole('heading', { name: 'content_script sample' }),
     ).toBeVisible();
+  });
+});
+
+test.describe('extension ID fixture override', () => {
+  test.use({
+    extensionId: OVERRIDDEN_EXTENSION_ID,
+  });
+
+  test('keeps readiness tied to the manifest key', async ({
+    extensionContext,
+    extensionId,
+  }) => {
+    expect(extensionId).toBe(OVERRIDDEN_EXTENSION_ID);
+    expect(extensionContext.browser()?.isConnected()).toBe(true);
   });
 });
 
