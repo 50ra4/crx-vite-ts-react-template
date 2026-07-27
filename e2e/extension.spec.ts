@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 
-import { expect, test } from './fixtures';
+import { E2E_EXTENSION_ID, expect, test } from './fixtures';
 
 const PRODUCTION_PAGE_URL = 'https://example.com/e2e-fixture';
 const EXTENSION_ORIGIN = 'chrome-extension://';
@@ -44,11 +44,14 @@ test.describe('extension ID fixture override', () => {
   });
 
   test('keeps readiness tied to the manifest key', async ({
-    extensionContext,
     extensionId,
+    extensionPage,
   }) => {
     expect(extensionId).toBe(OVERRIDDEN_EXTENSION_ID);
-    expect(extensionContext.browser()?.isConnected()).toBe(true);
+    const response = await extensionPage.goto(
+      extensionPageUrl(E2E_EXTENSION_ID, 'manifest.json'),
+    );
+    expect(response?.ok()).toBe(true);
   });
 });
 

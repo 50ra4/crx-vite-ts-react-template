@@ -44,7 +44,7 @@ type TestFixtures = {
   extensionPage: Page;
 };
 
-const E2E_EXTENSION_ID = createExtensionId(E2E_EXTENSION_KEY);
+export const E2E_EXTENSION_ID = createExtensionId(E2E_EXTENSION_KEY);
 
 const verifyExtensionLoaded = async (
   context: BrowserContext,
