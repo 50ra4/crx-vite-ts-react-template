@@ -28,6 +28,7 @@
     "preview": "vite preview",
     "package": "npm run build && npm run verify:manifest && node scripts/package-extension.mjs",
     "zip": "npm run package",
+    "render:icons": "node scripts/render-icons.mjs",
     "lint": "oxlint src scripts e2e *.config.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.mjs\" \"*.config.ts\"",
     "check-type": "tsc --noEmit",
