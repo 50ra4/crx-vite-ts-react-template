@@ -185,9 +185,12 @@ src/
 2. `src/entrypoints/` のサンプル UI(popup / options / content)と `greet`
    サンプルメッセージを自分の機能に置き換えます。
 3. `package.json` の npm パッケージ用 `name`、Chrome の人間可読な製品名用
-   `displayName`、description、repository を更新し、`manifest.config.ts` の
-   説明と `public/logo/` のアイコンも更新します。`displayName` がテンプレートの
-   既定値のままなら `npm run verify:manifest` が警告します。
+   `displayName`、description、repository と `manifest.config.ts` の説明を
+   更新します。`assets/branding/` の通常版・開発版 SVG を差し替えてから
+   `npm run render:icons` を実行し、`public/logo/` の 16/48/128 px PNG を
+   再生成します。開発版のファイル名は `-dev` suffix を維持します。
+   `displayName` がテンプレートの既定値のままなら
+   `npm run verify:manifest` が警告します。
 4. `manifest.config.ts` の content script `matches`(`https://example.com/*`)を
    変更または削除し、`scripts/expected-manifest.config.mjs` にも同じ変更を
    反映します(次節参照)。同じ期待値ファイルで、必要な拡張機能サーフェスと

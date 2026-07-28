@@ -190,10 +190,13 @@ The template separates reusable infrastructure (`src/lib/`) from sample code:
 2. Replace the sample UI in `src/entrypoints/` (popup / options / content) and
    the `greet` sample message with your own features.
 3. Update `package.json` (`name` for the npm package, `displayName` for the
-   human-readable Chrome product name, plus description and repository), the
-   manifest description in `manifest.config.ts`, and the icons in
-   `public/logo/`. `npm run verify:manifest` warns while `displayName` still
-   has the template default.
+   human-readable Chrome product name, plus description and repository) and
+   the manifest description in `manifest.config.ts`. Replace the normal and
+   development SVG sources in `assets/branding/`, then run
+   `npm run render:icons` to regenerate the 16/48/128 px PNG files in
+   `public/logo/`. Development icon filenames keep the `-dev` suffix.
+   `npm run verify:manifest` warns while `displayName` still has the template
+   default.
 4. Adjust or remove the content script `matches` (`https://example.com/*`) in
    `manifest.config.ts` — and mirror the change in
    `scripts/expected-manifest.config.mjs` (see below). The same expectation file
