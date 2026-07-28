@@ -196,8 +196,10 @@ The template separates reusable infrastructure (`src/lib/`) from sample code:
    has the template default.
 4. Adjust or remove the content script `matches` (`https://example.com/*`) in
    `manifest.config.ts` — and mirror the change in
-   `scripts/expected-manifest.config.mjs` (see below). The same expectation file
-   declares which extension surfaces and web-accessible resources must be present.
+   `scripts/expected-manifest.config.mjs` (see below), plus the production URL
+   and host-permission constants in `e2e/extension.spec.ts`. The same expectation
+   file declares which extension surfaces and web-accessible resources must be
+   present.
 
 `.claude/skills/adapt-template/SKILL.md` contains the full checklist.
 

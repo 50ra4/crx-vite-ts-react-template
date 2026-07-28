@@ -21,7 +21,7 @@ README's "Architecture" section for the full dependency-direction rules.
 | `npm run verify:full` | `verify` then `npm run e2e` | full contract; requires installed Chromium |
 | `npm run e2e` | Run Playwright Chromium smoke tests | requires a prior build and installed Chromium |
 | `npm run check-type` | `tsc --noEmit` | |
-| `npm test` | Run Vitest | src tests use jsdom; script tests use Node |
+| `npm test` | Run Vitest | src tests use jsdom; script and e2e helper tests use Node |
 | `npm run lint` | `oxlint` (check-only) | no file mutation; pre-commit runs the staged-only equivalent via lint-staged |
 | `npm run format` | `prettier --write` | rewrites files on disk; pre-commit runs the staged-only equivalent via lint-staged |
 | `npm run zip` | Alias for `npm run package` | |
@@ -119,7 +119,7 @@ Do not make these without explicit owner sign-off. Most are enforced by
 
 - Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`, `manifest.config.ts`, `playwright.config.ts`, `vitest.config.ts`), which must keep `export default` because Vite/CRXJS/Playwright/Vitest require it to load the config.
 - Components are arrow functions.
-- Unit tests are colocated as `*.test.ts(x)` next to TypeScript source or `*.test.mjs` next to Node scripts; Playwright smoke tests live under `e2e/` as `*.spec.ts`.
+- Unit tests are colocated as `*.test.ts(x)` next to TypeScript source or `*.test.mjs` next to Node scripts; E2E helper unit tests live under `e2e/` as `*.test.ts` with the Node environment pragma, while Playwright smoke tests use `*.spec.ts`.
 - Hooks return tuples `as const` (state, action).
 - Everything else (formatting, quote style, etc.) is enforced by Oxlint/Prettier/tsc — run them, don't hand-check. Import order is not lint-enforced (no Oxlint equivalent to the old `import/order`); keep imports reasonably grouped by convention.
 
