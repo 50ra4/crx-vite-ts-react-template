@@ -20,6 +20,7 @@ README's "Architecture" section for the full dependency-direction rules.
 | `npm run verify` | check-type → lint → test → build → verify:manifest, in series | the safety contract for most changes; excludes e2e for speed |
 | `npm run verify:full` | `verify` then `npm run e2e` | full contract; requires installed Chromium |
 | `npm run e2e` | Run Playwright Chromium smoke tests | requires a prior build and installed Chromium |
+| `npm run render:icons` | Render 16/48/128 px normal/dev PNG icons from SVG sources | requires installed Chromium |
 | `npm run check-type` | `tsc --noEmit` | |
 | `npm test` | Run Vitest | src tests use jsdom; script tests use Node |
 | `npm run lint` | `oxlint` (check-only) | no file mutation; pre-commit runs the staged-only equivalent via lint-staged |

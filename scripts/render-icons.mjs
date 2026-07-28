@@ -48,6 +48,7 @@ export const renderIcons = async ({
             element.style.width = `${dimension}px`;
           }, size);
           await icon.screenshot({
+            omitBackground: true,
             path: resolve(outputDirectory, `icon${size}${variant.suffix}.png`),
           });
         } finally {

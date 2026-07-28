@@ -3,11 +3,16 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { renderIcons } from './render-icons.mjs';
 
 const NORMAL_SVG = '<svg data-variant="normal"></svg>';
 const DEVELOPMENT_SVG = '<svg data-variant="development"></svg>';
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const committedIconDirectory = fileURLToPath(
+  new URL('../public/logo/', import.meta.url),
+);
 
 const createFakeBrowserType = ({ failingScreenshot = 0 } = {}) => {
   const pages = [];
@@ -98,8 +103,8 @@ test('renders normal and development SVGs at every extension icon size', async (
     'icon128-dev.png',
   ].map((filename) => join(repositoryDirectory, 'public', 'logo', filename));
   expect(
-    pages.map(({ locator }) => locator.screenshot.mock.calls[0][0].path),
-  ).toEqual(expectedPaths);
+    pages.map(({ locator }) => locator.screenshot.mock.calls[0][0]),
+  ).toEqual(expectedPaths.map((path) => ({ omitBackground: true, path })));
   await expect(
     Promise.all(expectedPaths.map((path) => readFile(path, 'utf8'))),
   ).resolves.toEqual([
@@ -114,6 +119,23 @@ test('renders normal and development SVGs at every extension icon size', async (
     expect(page.close).toHaveBeenCalledOnce();
   }
   expect(browser.close).toHaveBeenCalledOnce();
+});
+
+test.each([
+  ['icon16.png', 16],
+  ['icon48.png', 48],
+  ['icon128.png', 128],
+  ['icon16-dev.png', 16],
+  ['icon48-dev.png', 48],
+  ['icon128-dev.png', 128],
+])('%s is a square RGBA PNG at its declared size', async (filename, size) => {
+  const png = await readFile(join(committedIconDirectory, filename));
+
+  expect(png.subarray(0, PNG_SIGNATURE.length)).toEqual(PNG_SIGNATURE);
+  expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR');
+  expect(png.readUInt32BE(16)).toBe(size);
+  expect(png.readUInt32BE(20)).toBe(size);
+  expect(png[25]).toBe(6);
 });
 
 test('closes the active page and browser when rendering fails', async () => {

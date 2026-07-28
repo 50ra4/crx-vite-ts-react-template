@@ -117,6 +117,7 @@ DevTools パネルのサーフェスは意図的に含めていません。必�
 | ------------------------- | ------------------------------------------------------------------------ |
 | `npm test`                | Vitest ユニットテスト(jsdom。watch は `npm run test -- --watch`)       |
 | `npm run e2e`             | 実 Chromium でビルド済み拡張を検証する Playwright スモークテスト         |
+| `npm run render:icons`    | `assets/branding/*.svg` から通常版・開発版 PNG アイコンを再生成          |
 | `npm run lint`            | Oxlint(検査のみ。`chrome.*` 境界ルールを含む)                          |
 | `npm run format`          | Prettier(ファイルを書き換え)                                           |
 | `npm run check-type`      | `tsc --noEmit`                                                           |
@@ -126,7 +127,7 @@ DevTools パネルのサーフェスは意図的に含めていません。必�
 
 補足:
 
-- E2E は初回のみ Chromium のインストールが必要です:
+- E2E とアイコン生成は初回のみ Chromium のインストールが必要です:
   `npx playwright install chromium`
 - E2E は dev サーバではなく**ビルド成果物**を読み込むため、先にビルドします:
   `npm run build && npm run e2e`

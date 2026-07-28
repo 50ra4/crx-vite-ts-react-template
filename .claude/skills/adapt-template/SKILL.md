@@ -30,7 +30,8 @@ Checklist:
 - **Icons**: replace `assets/branding/icon.svg` and `icon-dev.svg`, then run
   `npm run render:icons` to regenerate the 16/48/128 px PNG files under
   `public/logo/`. The development variants keep the `-dev` suffix used by
-  `npm run dev`.
+  `npm run dev`. Install Chromium once with
+  `npx playwright install chromium` if Playwright has not downloaded it yet.
 - **`README.md`**: rewrite for the real project (current one describes the template itself).
 - **After cleanup, confirm CI still passes locally**: `npm run check-type`,
   `npm run build`, `npm test`.

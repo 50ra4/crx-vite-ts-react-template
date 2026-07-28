@@ -122,6 +122,7 @@ and `.claude/skills/add-entrypoint/SKILL.md`.
 | ------------------------- | ------------------------------------------------------------------------- |
 | `npm test`                | Vitest unit tests (jsdom; `npm run test -- --watch` for watch mode)       |
 | `npm run e2e`             | Playwright smoke tests against the built extension in a real Chromium     |
+| `npm run render:icons`    | Regenerates normal/dev PNG icons from `assets/branding/*.svg`             |
 | `npm run lint`            | Oxlint, check-only (includes the `chrome.*` boundary rule)                |
 | `npm run format`          | Prettier, rewrites files                                                  |
 | `npm run check-type`      | `tsc --noEmit`                                                            |
@@ -131,7 +132,8 @@ and `.claude/skills/add-entrypoint/SKILL.md`.
 
 Notes:
 
-- E2E requires Chromium once: `npx playwright install chromium`.
+- E2E and icon rendering require Chromium once:
+  `npx playwright install chromium`.
 - E2E loads the **build output**, not the dev server, so build first:
   `npm run build && npm run e2e`.
 - After changing code, `npm run verify` is the single command that proves the
