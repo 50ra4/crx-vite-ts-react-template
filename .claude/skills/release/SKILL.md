@@ -35,3 +35,23 @@ versions are copied to manifest `version`. Prereleases use the numeric SemVer
 core for `version` and the complete package version for `version_name`. Follow
 `docs/releasing.md`; use `npm version <version> --no-git-tag-version` to keep
 `package-lock.json` aligned.
+
+**(e) Store publishing checklist:**
+
+Only for releases submitted to the Chrome Web Store; internal or unlisted builds
+skip this phase. Complete "Chrome Web Store publishing checklist" in
+`docs/releasing.md` before tagging:
+
+1. Fill the three templates in `docs/store/` (`privacy-policy.md`,
+   `store-listing.md`, `manual-test.md`) with product-specific content, leaving
+   no placeholder or template comment behind.
+2. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
+   directory produced by `npm run package`), not a development build.
+3. Confirm `npm run verify:manifest` passes and that every `permissions`,
+   `host_permissions`, and `optional_permissions` entry in
+   `scripts/expected-manifest.config.mjs` has exactly one matching
+   justification in `docs/store/store-listing.md` — no extras on either side.
+4. Prepare the assets listed in that file's "Screenshot checklist".
+
+The store upload itself stays manual and happens after the GitHub Release
+succeeds.
