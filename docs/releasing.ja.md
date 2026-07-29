@@ -45,3 +45,27 @@ Chrome Manifest の `version` には数値部分 (`1.1.0`)、`version_name` に�
 
 タグ push 後、GitHub Actions が type check、lint、unit test、manifest 検証、実 Chromium E2E を実行する。
 すべて成功した場合だけ、自動生成ノートと `extension.zip` を含む GitHub Release が作成される。
+
+## 3. Chrome Web Store 公開前チェックリスト
+
+Chrome Web Store に提出するリリースでのみ実施する。社内配布や限定公開のビルドでは省略してよい。
+
+タグを付ける前に(手順 1 の一部として)、以下をすべて確認する。
+
+1. `docs/store/` の 3 文書([privacy-policy.md](./store/privacy-policy.md)、
+   [store-listing.md](./store/store-listing.md)、
+   [manual-test.md](./store/manual-test.md))が当該プロダクトの内容で記入され、
+   プレースホルダとテンプレートのコメントがすべて置き換えられていること。
+2. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
+   開発ビルドではなく、`npm run package` が生成した `extension/` ディレクトリを読み込んで実施する。
+3. `npm run verify:manifest` が成功し、`scripts/expected-manifest.config.mjs` の
+   `permissions` / `host_permissions` / `optional_permissions` の各エントリが、
+   [store-listing.md](./store/store-listing.md) の「Permission justifications」に
+   過不足なく 1 対 1 で対応していること。正当化のない権限も、
+   宣言していない権限に対する正当化も残さない。
+4. [store-listing.md](./store/store-listing.md) の「Screenshot checklist」に挙げた素材を、
+   当該バージョンのビルドから用意していること。
+
+GitHub Release の作成が成功した後、検証済みの `extension.zip` を Chrome Web Store
+デベロッパーダッシュボードから手動でアップロードする。公開は意図的に手動であり、
+Release workflow が Store へアップロードすることはない。

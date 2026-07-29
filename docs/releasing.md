@@ -50,3 +50,32 @@ After the tag is pushed, GitHub Actions runs the type check, lint, unit tests,
 manifest verification, and the real-Chromium E2E. Only if everything passes is
 a GitHub Release created, with auto-generated notes and `extension.zip`
 attached.
+
+## 3. Chrome Web Store publishing checklist
+
+Complete this only for releases that are submitted to the Chrome Web Store.
+Internal or unlisted builds can skip it.
+
+Before tagging — as part of step 1 — confirm all of the following.
+
+1. The three documents under `docs/store/`
+   ([privacy-policy.md](./store/privacy-policy.md),
+   [store-listing.md](./store/store-listing.md), and
+   [manual-test.md](./store/manual-test.md)) describe this product, with every
+   placeholder and template comment replaced.
+2. [manual-test.md](./store/manual-test.md) has been run against the packaged
+   build: load the `extension/` directory produced by `npm run package`, not a
+   development build.
+3. `npm run verify:manifest` passes, and every `permissions`,
+   `host_permissions`, and `optional_permissions` entry in
+   `scripts/expected-manifest.config.mjs` has exactly one matching
+   justification in the "Permission justifications" section of
+   [store-listing.md](./store/store-listing.md) — no unjustified permission,
+   and no justification for a permission that is not declared.
+4. The assets named in the "Screenshot checklist" section of
+   [store-listing.md](./store/store-listing.md) are prepared from this
+   version's build.
+
+After the GitHub Release succeeds, upload the verified `extension.zip` manually
+in the Chrome Web Store developer dashboard. Publishing is a manual step by
+design; the release workflow never uploads to the store.
