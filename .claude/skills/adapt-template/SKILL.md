@@ -29,8 +29,11 @@ Checklist:
   the HTML file, the `src/entrypoints/<surface>/<name>.tsx` file, and the
   matching key in `manifest.config.ts` together (see `.claude/skills/add-entrypoint/SKILL.md`
   for what the three wiring points are).
-- **Icons**: replace files under `public/logo/` (icon16/48/128, plus the
-  `-dev` variants used by `npm run dev`).
+- **Icons**: replace `assets/branding/icon.svg` and `icon-dev.svg`, then run
+  `npm run render:icons` to regenerate the 16/48/128 px PNG files under
+  `public/logo/`. The development variants keep the `-dev` suffix used by
+  `npm run dev`. Install Chromium once with
+  `npx playwright install chromium` if Playwright has not downloaded it yet.
 - **`README.md`**: rewrite for the real project (current one describes the template itself).
 - **After cleanup, confirm CI still passes locally**: `npm run check-type`,
   `npm run build`, `npm test`.

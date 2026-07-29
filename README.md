@@ -122,6 +122,7 @@ and `.claude/skills/add-entrypoint/SKILL.md`.
 | ------------------------- | ------------------------------------------------------------------------- |
 | `npm test`                | Vitest unit tests (jsdom; `npm run test -- --watch` for watch mode)       |
 | `npm run e2e`             | Playwright smoke tests against the built extension in a real Chromium     |
+| `npm run render:icons`    | Regenerates normal/dev PNG icons from `assets/branding/*.svg`             |
 | `npm run lint`            | Oxlint, check-only (includes the `chrome.*` boundary rule)                |
 | `npm run format`          | Prettier, rewrites files                                                  |
 | `npm run check-type`      | `tsc --noEmit`                                                            |
@@ -131,7 +132,8 @@ and `.claude/skills/add-entrypoint/SKILL.md`.
 
 Notes:
 
-- E2E requires Chromium once: `npx playwright install chromium`.
+- E2E and icon rendering require Chromium once:
+  `npx playwright install chromium`.
 - E2E loads the **build output**, not the dev server, so build first:
   `npm run build && npm run e2e`.
 - After changing code, `npm run verify` is the single command that proves the
@@ -190,10 +192,13 @@ The template separates reusable infrastructure (`src/lib/`) from sample code:
 2. Replace the sample UI in `src/entrypoints/` (popup / options / content) and
    the `greet` sample message with your own features.
 3. Update `package.json` (`name` for the npm package, `displayName` for the
-   human-readable Chrome product name, plus description and repository), the
-   manifest description in `manifest.config.ts`, and the icons in
-   `public/logo/`. `npm run verify:manifest` warns while `displayName` still
-   has the template default.
+   human-readable Chrome product name, plus description and repository) and
+   the manifest description in `manifest.config.ts`. Replace the normal and
+   development SVG sources in `assets/branding/`, then run
+   `npm run render:icons` to regenerate the 16/48/128 px PNG files in
+   `public/logo/`. Development icon filenames keep the `-dev` suffix.
+   `npm run verify:manifest` warns while `displayName` still has the template
+   default.
 4. Adjust or remove the content script `matches` (`https://example.com/*`) in
    `manifest.config.ts` — and mirror the change in
    `scripts/expected-manifest.config.mjs` (see below), plus the production URL
