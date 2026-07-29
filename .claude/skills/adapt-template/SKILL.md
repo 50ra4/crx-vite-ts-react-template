@@ -35,5 +35,12 @@ Checklist:
   `npm run dev`. Install Chromium once with
   `npx playwright install chromium` if Playwright has not downloaded it yet.
 - **`README.md`**: rewrite for the real project (current one describes the template itself).
+- **`docs/store/`**: rewrite the three Chrome Web Store templates
+  (`privacy-policy.md`, `store-listing.md`, `manual-test.md`) for the real
+  product, replacing every placeholder and HTML comment — they ship as blank
+  forms, not as usable copy. Their permission and stored-data sections must
+  match the final `manifest.config.ts`, so do this after the permission review
+  above (see `.claude/skills/release/SKILL.md` phase (e) for when these
+  documents gate a release).
 - **After cleanup, confirm CI still passes locally**: `npm run check-type`,
   `npm run build`, `npm test`.
