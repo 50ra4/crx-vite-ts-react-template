@@ -16,10 +16,7 @@ the publishing checklist in [../releasing.md](../releasing.md).
    and select `extension/`.
 5. Open DevTools and keep the Network tab visible for the whole run.
 
-<!--
-Three standing rules apply to every section below; state them here in whatever
-form suits the product, and keep them in the final document rather than
-deleting them with the rest of the comments:
+Three standing rules apply to every section below, for the whole run:
 
 - Watch the Network tab. Unless the extension is documented as making network
   requests, any request it originates is a failure, not a curiosity.
@@ -28,6 +25,12 @@ deleting them with the rest of the comments:
 - Keep private context out of the record. Repository names, URLs, file paths,
   note contents, and screenshots taken from private pages do not belong in
   logs, issues, or pull requests.
+
+<!--
+The three rules above are document text, not a placeholder: they stay in the
+final document. Reword them to fit the product if needed — for example, name
+the exact requests that are expected when the extension does make network
+requests — but do not delete them along with the HTML comments.
 -->
 
 ## <!-- Feature area -->
@@ -49,16 +52,22 @@ not a specification.
 
 ## Safety checks
 
-- [ ] The Network tab shows no request originated by the extension <!-- reword
-      only if the extension is documented as making requests, and then list the
-      exact requests that are expected -->
+<!--
+Keep all four checks. Two of them need product-specific wording:
+
+- The network check: reword it only if the extension is documented as making
+  requests, and then name the exact requests that are expected.
+- The sensitive-input check: it covers password, payment, and credential
+  fields; every form the extension touches during the run must be a fixture.
+-->
+
+- [ ] The Network tab shows no request originated by the extension
 - [ ] `npm run verify:manifest` passes, and the built `extension/manifest.json`
       declares exactly the permissions, host permissions, and content-script
       matches justified in [store-listing.md](./store-listing.md) — no more, no
       less
 - [ ] No sensitive input was written or submitted by the extension during the
-      run <!-- password, payment, and credential fields; every form it touches
-      must be a test fixture -->
+      run
 - [ ] Stored data appears, changes, and disappears as described in
       [privacy-policy.md](./privacy-policy.md), including after uninstall
 

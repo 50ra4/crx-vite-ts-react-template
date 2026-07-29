@@ -79,21 +79,21 @@ future plans.
 Optional, but it is the cheapest trust the listing can buy: an explicit list of
 the broad permissions a reviewer might expect and this extension does not take.
 
-Replace the example bullets below with the ones that are actually plausible for
-this product — naming permissions nobody would expect adds noise instead of
-trust. Every bullet must be absent from `manifest.config.ts`; check before
-publishing. The example list is taken from pr-review-focus-pins, a
-content-script extension that requests no host permissions.
+List only permissions that are plausible for this product to want — naming
+permissions nobody would expect adds noise instead of trust. Every bullet must
+be verified absent from `manifest.config.ts` before publishing; a permission
+listed here that the manifest actually declares is a false statement to a
+reviewer.
+
+Reference example (do not paste verbatim — keep only what applies to this
+product): a content-script extension that requests no host permissions might
+list `tabs`, `activeTab`, `scripting`, `identity`, `webRequest`,
+`host_permissions`, `optional_permissions`, and `<all_urls>`. The pattern comes
+from pr-review-focus-pins.
 -->
 
-- `tabs`
-- `activeTab`
-- `scripting`
-- `identity`
-- `webRequest`
-- `host_permissions`
-- `optional_permissions`
-- `<all_urls>`
+- <!-- permission this product deliberately does not request -->
+- <!-- permission this product deliberately does not request -->
 
 <!--
 Close with anything else the manifest deliberately omits, such as
@@ -102,6 +102,14 @@ in this template.
 -->
 
 ## English store description
+
+### Name
+
+<!--
+The name shown on the store page. Normally identical to `displayName` in
+`package.json`; if it differs, say why here so the two do not drift apart
+unnoticed.
+-->
 
 ### Short description
 
@@ -129,6 +137,14 @@ dashboard. Keep the claims identical: a translation that promises more than the
 English version is a compliance problem, not a copywriting choice.
 -->
 
+### 名称
+
+<!--
+Japanese locale name. Keep it identical to the English name unless this locale
+genuinely needs a different one — a product name that changes per locale splits
+search results and support requests.
+-->
+
 ### 短い説明
 
 <!-- Japanese short description, plain text, same limit as the English one. -->
@@ -149,6 +165,9 @@ bullets with the real surfaces.
 - `docs/images/<!-- surface -->.png`: <!-- what must be visible -->
 
 - [ ] Captured from the packaged build of the version being submitted
+- [ ] The store icon matches the production icons this build ships — the ones
+      `npm run render:icons` writes from the SVG sources, not the development
+      variants
 - [ ] Sized to the Chrome Web Store's currently required dimensions — check the
       dashboard rather than reusing an old asset, since the requirement changes
 - [ ] Free of production, personal, and customer data in every frame
