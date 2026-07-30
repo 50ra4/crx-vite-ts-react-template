@@ -7,6 +7,11 @@ order: reviewers read the policy top to bottom and expect these headings.
 
 This document is English-only on purpose — the Chrome Web Store requires one
 privacy policy, and the translated listing text lives in ./store-listing.md.
+
+This file is the source that gets published, not the published artifact: the
+store requires the policy to be reachable at a public URL registered in the
+developer dashboard, so mirror this content there and re-publish it on every
+revision. See the publishing checklist in [../releasing.md](../releasing.md).
 -->
 
 Effective date: <!-- YYYY-MM-DD -->
@@ -54,6 +59,12 @@ anything syncs across the user's profiles.
 
 If the extension persists nothing, say so in one sentence and delete the
 bullets below.
+
+Take the list from the implementation, not from `manifest.config.ts` — the
+manifest only shows whether the `storage` permission is held. Start from every
+key and `area` in `src/lib/storage/schema.ts`, then add any other persistence the
+code uses (IndexedDB, `localStorage` / `sessionStorage`, cookies, `chrome.storage`
+calls made outside the schema).
 -->
 
 - <!-- stored value — storage area -->

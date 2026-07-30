@@ -48,7 +48,10 @@ Chrome Manifest の `version` には数値部分 (`1.1.0`)、`version_name` に�
 
 ## 3. Chrome Web Store 公開前チェックリスト
 
-Chrome Web Store に提出するリリースでのみ実施する。社内配布や限定公開のビルドでは省略してよい。
+Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)** を含めてすべて実施する。
+限定公開は検索結果に表示されないだけのストア公開形態であり、審査・掲載情報・
+プライバシー申告は公開リリースと同一である。省略できるのはストアを介さない配布
+(自己ホストの `.zip` / `.crx`、エンタープライズポリシーによる配布)だけである。
 
 タグを付ける前に(手順 1 の一部として)、以下をすべて確認する。
 
@@ -56,14 +59,21 @@ Chrome Web Store に提出するリリースでのみ実施する。社内配布
    [store-listing.md](./store/store-listing.md)、
    [manual-test.md](./store/manual-test.md))が当該プロダクトの内容で記入され、
    プレースホルダとテンプレートのコメントがすべて置き換えられていること。
-2. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
+2. ユーザーデータを扱う場合(ローカルに保存するだけの場合も含む)、
+   プライバシーポリシーが安定した公開 URL に掲載され、その URL が
+   デベロッパーダッシュボードのプライバシー欄に設定され、
+   掲載内容が当該バージョンの [privacy-policy.md](./store/privacy-policy.md) と
+   一致していること。リポジトリ内の Markdown を記入するだけでは要件を満たさない。
+   審査で読まれるのは公開ページであるため、初回提出前にホスティング先を決め、
+   ポリシー変更時は必ず再掲載する。
+3. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
    開発ビルドではなく、`npm run package` が生成した `extension/` ディレクトリを読み込んで実施する。
-3. `npm run verify:manifest` が成功し、`scripts/expected-manifest.config.mjs` の
+4. `npm run verify:manifest` が成功し、`scripts/expected-manifest.config.mjs` の
    `permissions` / `host_permissions` / `optional_permissions` の各エントリが、
    [store-listing.md](./store/store-listing.md) の「Permission justifications」に
    過不足なく 1 対 1 で対応していること。正当化のない権限も、
    宣言していない権限に対する正当化も残さない。
-4. [store-listing.md](./store/store-listing.md) の「Screenshot checklist」に挙げた素材を、
+5. [store-listing.md](./store/store-listing.md) の「Screenshot checklist」に挙げた素材を、
    当該バージョンのビルドから用意していること。
 
 GitHub Release の作成が成功した後、検証済みの `extension.zip` を Chrome Web Store

@@ -14,12 +14,30 @@ the publishing checklist in [../releasing.md](../releasing.md).
 3. Run `npm run verify:full`.
 4. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**,
    and select `extension/`.
-5. Open DevTools and keep the Network tab visible for the whole run.
+5. Set up network recording that covers **every** extension context. One
+   DevTools window is not enough: a Network panel only records the context it is
+   attached to, so a page's DevTools never shows requests made by the background
+   service worker, the popup, or the options page. Choose one of:
+   - **Per-context DevTools** — open a separate inspector for each context that
+     exists in this build, and keep each Network panel open for the whole run:
+     - background service worker: `chrome://extensions` → the extension card →
+       **service worker** under "Inspect views" (re-open it after the worker is
+       terminated and restarted; requests made before the inspector attaches are
+       not recorded)
+     - popup: open the popup, right-click inside it → **Inspect**
+     - options page: open it in a tab and use that tab's DevTools
+     - content script: the DevTools of each host page the script runs on
+   - **`chrome://net-export`** — start a capture before step 4, run the whole
+     test, then stop it and inspect the log with
+     [netlog-viewer](https://netlog-viewer.appspot.com/). This records every
+     context in one file and is the safer choice when the extension has a
+     background worker that can wake outside your view.
 
 Three standing rules apply to every section below, for the whole run:
 
-- Watch the Network tab. Unless the extension is documented as making network
-  requests, any request it originates is a failure, not a curiosity.
+- Watch the network recording for all contexts, not just the page under test.
+  Unless the extension is documented as making network requests, any request it
+  originates is a failure, not a curiosity.
 - Use fixtures or throwaway accounts. Never exercise the extension against
   production systems, real customer data, or real credentials.
 - Keep private context out of the record. Repository names, URLs, file paths,
@@ -61,7 +79,9 @@ Keep all four checks. Two of them need product-specific wording:
   fields; every form the extension touches during the run must be a fixture.
 -->
 
-- [ ] The Network tab shows no request originated by the extension
+- [ ] The network recording covering every extension context (background service
+      worker, popup, options page, and each host page running a content script)
+      shows no request originated by the extension
 - [ ] `npm run verify:manifest` passes, and the built `extension/manifest.json`
       declares exactly the permissions, host permissions, and content-script
       matches justified in [store-listing.md](./store-listing.md) — no more, no

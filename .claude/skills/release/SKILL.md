@@ -38,20 +38,28 @@ core for `version` and the complete package version for `version_name`. Follow
 
 **(e) Store publishing checklist:**
 
-Only for releases submitted to the Chrome Web Store; internal or unlisted builds
-skip this phase. Complete "Chrome Web Store publishing checklist" in
-`docs/releasing.md` before tagging:
+For every release submitted to the Chrome Web Store, **including unlisted ones**
+— unlisted is a store distribution hidden from search, subject to the same
+review, listing information, and privacy declarations. Only distribution outside
+the store (self-hosted `.zip`/`.crx`, enterprise policy) skips this phase.
+Complete "Chrome Web Store publishing checklist" in `docs/releasing.md` before
+tagging:
 
 1. Fill the three templates in `docs/store/` (`privacy-policy.md`,
    `store-listing.md`, `manual-test.md`) with product-specific content, leaving
    no placeholder or template comment behind.
-2. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
+2. If the extension handles user data (local persistence included), publish the
+   privacy policy at a stable public URL, set that URL in the developer
+   dashboard's privacy fields, and confirm the hosted page matches
+   `docs/store/privacy-policy.md` at this version — the repository file alone
+   does not satisfy the requirement.
+3. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
    directory produced by `npm run package`), not a development build.
-3. Confirm `npm run verify:manifest` passes and that every `permissions`,
+4. Confirm `npm run verify:manifest` passes and that every `permissions`,
    `host_permissions`, and `optional_permissions` entry in
    `scripts/expected-manifest.config.mjs` has exactly one matching
    justification in `docs/store/store-listing.md` — no extras on either side.
-4. Prepare the assets listed in that file's "Screenshot checklist".
+5. Prepare the assets listed in that file's "Screenshot checklist".
 
 The store upload itself stays manual and happens after the GitHub Release
 succeeds.

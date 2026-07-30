@@ -53,8 +53,11 @@ attached.
 
 ## 3. Chrome Web Store publishing checklist
 
-Complete this only for releases that are submitted to the Chrome Web Store.
-Internal or unlisted builds can skip it.
+Complete this for every release submitted to the Chrome Web Store, including
+**unlisted** ones: unlisted is a store distribution that is merely hidden from
+search, so it goes through the same review, listing information, and privacy
+declarations as a public listing. Only distribution that never touches the store
+— a self-hosted `.zip`/`.crx` or an enterprise-policy install — can skip it.
 
 Before tagging — as part of step 1 — confirm all of the following.
 
@@ -63,16 +66,23 @@ Before tagging — as part of step 1 — confirm all of the following.
    [store-listing.md](./store/store-listing.md), and
    [manual-test.md](./store/manual-test.md)) describe this product, with every
    placeholder and template comment replaced.
-2. [manual-test.md](./store/manual-test.md) has been run against the packaged
+2. If the extension handles user data — including data it only persists locally
+   — the privacy policy is published at a stable public URL, that URL is set in
+   the developer dashboard's privacy fields, and the page served there matches
+   [privacy-policy.md](./store/privacy-policy.md) at this version. A completed
+   Markdown file in the repository does not satisfy the requirement on its own:
+   the reviewer reads the hosted page, so decide the hosting location before the
+   first submission and re-publish it whenever the policy changes.
+3. [manual-test.md](./store/manual-test.md) has been run against the packaged
    build: load the `extension/` directory produced by `npm run package`, not a
    development build.
-3. `npm run verify:manifest` passes, and every `permissions`,
+4. `npm run verify:manifest` passes, and every `permissions`,
    `host_permissions`, and `optional_permissions` entry in
    `scripts/expected-manifest.config.mjs` has exactly one matching
    justification in the "Permission justifications" section of
    [store-listing.md](./store/store-listing.md) — no unjustified permission,
    and no justification for a permission that is not declared.
-4. The assets named in the "Screenshot checklist" section of
+5. The assets named in the "Screenshot checklist" section of
    [store-listing.md](./store/store-listing.md) are prepared from this
    version's build.
 
