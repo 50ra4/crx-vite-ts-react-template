@@ -66,14 +66,23 @@ Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)**
    一致していること。リポジトリ内の Markdown を記入するだけでは要件を満たさない。
    審査で読まれるのは公開ページであるため、初回提出前にホスティング先を決め、
    ポリシー変更時は必ず再掲載する。
-3. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
+3. ダッシュボードの **Privacy practices** フォームが、URL だけでなく
+   全項目記入済みであること。single purpose の説明、各権限とリモートコードの
+   正当化、収集するデータ種別とその利用目的・共有方針、認証(certification)の
+   チェック項目が、提出するビルドと `docs/store/` の 3 文書に一致している必要がある。
+   公開 URL の設定だけではこれらの項目は 1 つも埋まらず、
+   [privacy-policy.md](./store/privacy-policy.md) 自体がダッシュボード申告との
+   一致を要求しているため、アップロード時ではなくタグ付け前にフォームを
+   上から順に確認する。
+4. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
    開発ビルドではなく、`npm run package` が生成した `extension/` ディレクトリを読み込んで実施する。
-4. `npm run verify:manifest` が成功し、`scripts/expected-manifest.config.mjs` の
-   `permissions` / `host_permissions` / `optional_permissions` の各エントリが、
+5. `npm run verify:manifest` が成功し、`scripts/expected-manifest.config.mjs` の
+   `permissions` / `host_permissions` / `optional_permissions` /
+   `optional_host_permissions` の各エントリが、
    [store-listing.md](./store/store-listing.md) の「Permission justifications」に
    過不足なく 1 対 1 で対応していること。正当化のない権限も、
    宣言していない権限に対する正当化も残さない。
-5. [store-listing.md](./store/store-listing.md) の「Screenshot checklist」に挙げた素材を、
+6. [store-listing.md](./store/store-listing.md) の「Screenshot checklist」に挙げた素材を、
    当該バージョンのビルドから用意していること。
 
 GitHub Release の作成が成功した後、検証済みの `extension.zip` を Chrome Web Store

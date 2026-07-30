@@ -73,16 +73,25 @@ Before tagging — as part of step 1 — confirm all of the following.
    Markdown file in the repository does not satisfy the requirement on its own:
    the reviewer reads the hosted page, so decide the hosting location before the
    first submission and re-publish it whenever the policy changes.
-3. [manual-test.md](./store/manual-test.md) has been run against the packaged
+3. The dashboard's **Privacy practices** form is filled in — not just the policy
+   URL. Every field it asks for (the single-purpose description, the
+   justification of each permission and of remote code, the data types
+   collected, their usage and sharing, and the certification checkboxes) matches
+   the build being submitted and the three `docs/store/` documents. The URL alone
+   satisfies none of these fields, and
+   [privacy-policy.md](./store/privacy-policy.md) requires its own text to agree
+   with them, so walk the form top to bottom before tagging rather than at
+   upload time.
+4. [manual-test.md](./store/manual-test.md) has been run against the packaged
    build: load the `extension/` directory produced by `npm run package`, not a
    development build.
-4. `npm run verify:manifest` passes, and every `permissions`,
-   `host_permissions`, and `optional_permissions` entry in
-   `scripts/expected-manifest.config.mjs` has exactly one matching
+5. `npm run verify:manifest` passes, and every `permissions`,
+   `host_permissions`, `optional_permissions`, and `optional_host_permissions`
+   entry in `scripts/expected-manifest.config.mjs` has exactly one matching
    justification in the "Permission justifications" section of
    [store-listing.md](./store/store-listing.md) — no unjustified permission,
    and no justification for a permission that is not declared.
-5. The assets named in the "Screenshot checklist" section of
+6. The assets named in the "Screenshot checklist" section of
    [store-listing.md](./store/store-listing.md) are prepared from this
    version's build.
 

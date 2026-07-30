@@ -53,13 +53,18 @@ tagging:
    dashboard's privacy fields, and confirm the hosted page matches
    `docs/store/privacy-policy.md` at this version — the repository file alone
    does not satisfy the requirement.
-3. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
+3. Complete the dashboard's **Privacy practices** form, not just the policy URL:
+   single-purpose description, permission and remote-code justifications,
+   collected data types with usage and sharing, and the certification
+   checkboxes — each matching the submitted build and the three `docs/store/`
+   documents.
+4. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
    directory produced by `npm run package`), not a development build.
-4. Confirm `npm run verify:manifest` passes and that every `permissions`,
-   `host_permissions`, and `optional_permissions` entry in
-   `scripts/expected-manifest.config.mjs` has exactly one matching
+5. Confirm `npm run verify:manifest` passes and that every `permissions`,
+   `host_permissions`, `optional_permissions`, and `optional_host_permissions`
+   entry in `scripts/expected-manifest.config.mjs` has exactly one matching
    justification in `docs/store/store-listing.md` — no extras on either side.
-5. Prepare the assets listed in that file's "Screenshot checklist".
+6. Prepare the assets listed in that file's "Screenshot checklist".
 
 The store upload itself stays manual and happens after the GitHub Release
 succeeds.

@@ -100,7 +100,8 @@ which data does and does not cross that boundary.
 <!--
 Do not restate the permission justifications here — keep one source of truth so
 the two documents cannot drift apart. A sentence naming the declared
-permissions and content-script matches at a high level is enough, followed by:
+permissions (including the optional ones) and content-script matches at a high
+level is enough, followed by:
 
   See [store-listing.md](./store-listing.md) for the justification of each
   permission and content-script match.

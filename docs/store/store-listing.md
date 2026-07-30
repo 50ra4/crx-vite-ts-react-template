@@ -25,9 +25,11 @@ statement.
 
 <!--
 Mirror `manifest.config.ts` one-to-one. Every entry in
-`content_scripts[].matches`, `permissions`, `host_permissions`, and
-`optional_permissions` gets exactly one subsection below, and no subsection may
-describe a permission that is not declared.
+`content_scripts[].matches`, `permissions`, `host_permissions`,
+`optional_permissions`, and `optional_host_permissions` gets exactly one
+subsection below, and no subsection may describe a permission that is not
+declared. Optional permissions need a justification even though the user is
+prompted at grant time — the reviewer sees them in the manifest either way.
 `scripts/expected-manifest.config.mjs` holds the same lists, so
 `npm run verify:manifest` is what proves the manifest itself has not drifted;
 keeping this section aligned with that file is a manual step in the release
@@ -63,14 +65,15 @@ that boundary.
 ### <!-- permission name -->
 
 <!--
-Duplicate this heading once per `permissions`, `host_permissions`, and
-`optional_permissions` entry, using the exact manifest string as the heading
-text.
+Duplicate this heading once per `permissions`, `host_permissions`,
+`optional_permissions`, and `optional_host_permissions` entry, using the exact
+manifest string as the heading text.
 
 Two or three sentences each: the user-visible capability that requires it, the
 narrowest scope it is actually used at, and what it is not used for. Justify a
 permission by the feature that fails without it, never by convenience or by
-future plans.
+future plans. For an optional entry, also name the user action that triggers the
+grant prompt and what the extension does when the grant is declined.
 -->
 
 ## Permissions deliberately not requested

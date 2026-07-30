@@ -17,9 +17,19 @@ the publishing checklist in [../releasing.md](../releasing.md).
 5. Set up network recording that covers **every** extension context. One
    DevTools window is not enough: a Network panel only records the context it is
    attached to, so a page's DevTools never shows requests made by the background
-   service worker, the popup, or the options page. Choose one of:
-   - **Per-context DevTools** — open a separate inspector for each context that
-     exists in this build, and keep each Network panel open for the whole run:
+   service worker, the popup, or the options page.
+   - **`chrome://net-export`** — start a capture in a separate tab *before*
+     step 4, run the whole test, then stop it and inspect the log with
+     [netlog-viewer](https://netlog-viewer.appspot.com/). This records every
+     context in one file and keeps recording across service-worker restarts.
+     **Required for the lifecycle section** (install, reload, extension update,
+     uninstall): those steps tear the worker's inspector down, so a DevTools-only
+     setup silently misses the traffic a freshly started worker sends before you
+     can re-attach.
+   - **Per-context DevTools** — usable for the non-lifecycle sections, and useful
+     alongside net-export because it shows initiators and request bodies. Open a
+     separate inspector for each context that exists in this build and keep each
+     Network panel open for the whole run:
      - background service worker: `chrome://extensions` → the extension card →
        **service worker** under "Inspect views" (re-open it after the worker is
        terminated and restarted; requests made before the inspector attaches are
@@ -27,11 +37,6 @@ the publishing checklist in [../releasing.md](../releasing.md).
      - popup: open the popup, right-click inside it → **Inspect**
      - options page: open it in a tab and use that tab's DevTools
      - content script: the DevTools of each host page the script runs on
-   - **`chrome://net-export`** — start a capture before step 4, run the whole
-     test, then stop it and inspect the log with
-     [netlog-viewer](https://netlog-viewer.appspot.com/). This records every
-     context in one file and is the safer choice when the extension has a
-     background worker that can wake outside your view.
 
 Three standing rules apply to every section below, for the whole run:
 
@@ -59,6 +64,10 @@ capability, plus one for lifecycle (install, reload, extension update,
 uninstall). Order the sections so a tester can work top to bottom without
 resetting state in between.
 
+Run the lifecycle section with the `chrome://net-export` capture from Setup step
+5 active; per-context DevTools cannot cover it, because every restart detaches
+the service worker's inspector.
+
 Write each item as one checkbox pairing an action with its expected observable
 result, so a failure is unambiguous and reproducible by someone else. Keep the
 whole document short enough to run in a single sitting: this is a release gate,
@@ -83,9 +92,9 @@ Keep all four checks. Two of them need product-specific wording:
       worker, popup, options page, and each host page running a content script)
       shows no request originated by the extension
 - [ ] `npm run verify:manifest` passes, and the built `extension/manifest.json`
-      declares exactly the permissions, host permissions, and content-script
-      matches justified in [store-listing.md](./store-listing.md) — no more, no
-      less
+      declares exactly the permissions, host permissions, optional permissions,
+      optional host permissions, and content-script matches justified in
+      [store-listing.md](./store-listing.md) — no more, no less
 - [ ] No sensitive input was written or submitted by the extension during the
       run
 - [ ] Stored data appears, changes, and disappears as described in
