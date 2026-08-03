@@ -85,12 +85,15 @@ Before tagging — as part of step 1 — confirm all of the following.
 4. [manual-test.md](./store/manual-test.md) has been run against the packaged
    build: load the `extension/` directory produced by `npm run package`, not a
    development build.
-5. `npm run verify:manifest` passes, and every `permissions`,
-   `host_permissions`, `optional_permissions`, and `optional_host_permissions`
-   entry in `scripts/expected-manifest.config.mjs` has exactly one matching
-   justification in the "Permission justifications" section of
-   [store-listing.md](./store/store-listing.md) — no unjustified permission,
-   and no justification for a permission that is not declared.
+5. `npm run verify:manifest` passes, and every access-granting entry in
+   `scripts/expected-manifest.config.mjs` has exactly one matching justification
+   in the "Permission justifications" section of
+   [store-listing.md](./store/store-listing.md) — no unjustified entry, and no
+   justification for something that is not declared. That covers all six lists
+   the verifier checks: `permissions`, `host_permissions`,
+   `optional_permissions`, `optional_host_permissions`,
+   `content_scripts[].matches`, and `web_accessible_resources` (each entry's
+   `resources` and the `matches` it is exposed to).
 6. The assets named in the "Screenshot checklist" section of
    [store-listing.md](./store/store-listing.md) are prepared from this
    version's build.

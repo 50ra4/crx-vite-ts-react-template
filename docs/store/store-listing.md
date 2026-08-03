@@ -26,10 +26,11 @@ statement.
 <!--
 Mirror `manifest.config.ts` one-to-one. Every entry in
 `content_scripts[].matches`, `permissions`, `host_permissions`,
-`optional_permissions`, and `optional_host_permissions` gets exactly one
-subsection below, and no subsection may describe a permission that is not
-declared. Optional permissions need a justification even though the user is
-prompted at grant time — the reviewer sees them in the manifest either way.
+`optional_permissions`, `optional_host_permissions`, and
+`web_accessible_resources` gets exactly one subsection below, and no subsection
+may describe an entry that is not declared. Optional permissions need a
+justification even though the user is prompted at grant time — the reviewer sees
+them in the manifest either way.
 `scripts/expected-manifest.config.mjs` holds the same lists, so
 `npm run verify:manifest` is what proves the manifest itself has not drifted;
 keeping this section aligned with that file is a manual step in the release
@@ -57,9 +58,17 @@ a narrower pattern cannot express it (for example arbitrary owner, repository,
 ref, or id path segments); and what the script does on non-matching routes —
 ideally exit before observing anything. State whether the pattern is a
 content-script match only or also a `host_permissions` grant, since reviewers
-treat those differently. If `web_accessible_resources` exposes anything to the
-page, justify each entry here as well, including what may and may not cross
-that boundary.
+treat those differently.
+-->
+
+### Web-accessible resources: <!-- resource path -->
+
+<!--
+Duplicate this heading once per `web_accessible_resources[].resources` entry —
+including when the extension declares no content scripts, since a resource can
+be exposed without one. Name the `matches` (or `extension_ids`) it is exposed
+to, why the page needs to reach it, and what may and may not cross that
+boundary. Delete this heading only if `web_accessible_resources` is empty.
 -->
 
 ### <!-- permission name -->

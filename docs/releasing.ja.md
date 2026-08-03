@@ -77,11 +77,13 @@ Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)**
 4. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
    開発ビルドではなく、`npm run package` が生成した `extension/` ディレクトリを読み込んで実施する。
 5. `npm run verify:manifest` が成功し、`scripts/expected-manifest.config.mjs` の
-   `permissions` / `host_permissions` / `optional_permissions` /
-   `optional_host_permissions` の各エントリが、
-   [store-listing.md](./store/store-listing.md) の「Permission justifications」に
-   過不足なく 1 対 1 で対応していること。正当化のない権限も、
-   宣言していない権限に対する正当化も残さない。
+   アクセスを与える全エントリが、[store-listing.md](./store/store-listing.md) の
+   「Permission justifications」に過不足なく 1 対 1 で対応していること。
+   対象は verifier が検証する 6 つのリストすべて — `permissions` /
+   `host_permissions` / `optional_permissions` / `optional_host_permissions` /
+   `content_scripts[].matches` / `web_accessible_resources`(各エントリの
+   `resources` と、それを公開する `matches`)。正当化のないエントリも、
+   宣言していない対象への正当化も残さない。
 6. [store-listing.md](./store/store-listing.md) の「Screenshot checklist」に挙げた素材を、
    当該バージョンのビルドから用意していること。
 

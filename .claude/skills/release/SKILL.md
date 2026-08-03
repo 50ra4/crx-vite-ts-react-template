@@ -60,10 +60,12 @@ tagging:
    documents.
 4. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
    directory produced by `npm run package`), not a development build.
-5. Confirm `npm run verify:manifest` passes and that every `permissions`,
-   `host_permissions`, `optional_permissions`, and `optional_host_permissions`
-   entry in `scripts/expected-manifest.config.mjs` has exactly one matching
+5. Confirm `npm run verify:manifest` passes and that every access-granting entry
+   in `scripts/expected-manifest.config.mjs` has exactly one matching
    justification in `docs/store/store-listing.md` — no extras on either side.
+   All six verified lists count: `permissions`, `host_permissions`,
+   `optional_permissions`, `optional_host_permissions`,
+   `content_scripts[].matches`, and `web_accessible_resources`.
 6. Prepare the assets listed in that file's "Screenshot checklist".
 
 The store upload itself stays manual and happens after the GitHub Release
