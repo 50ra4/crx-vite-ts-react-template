@@ -42,31 +42,48 @@ For every release submitted to the Chrome Web Store, **including unlisted ones**
 — unlisted is a store distribution hidden from search, subject to the same
 review, listing information, and privacy declarations. Only distribution outside
 the store (self-hosted `.zip`/`.crx`, enterprise policy) skips this phase.
-Complete "Chrome Web Store publishing checklist" in `docs/releasing.md` before
-tagging:
+Follow "Chrome Web Store publishing checklist" in `docs/releasing.md`. It is two
+gates, because the dashboard's privacy and listing forms do not exist until a
+first package upload creates the item; an upload only creates or updates a
+draft, so a first submission may upload one before tagging just to open them.
+
+Before tagging (all verifiable locally):
 
 1. Fill the three templates in `docs/store/` (`privacy-policy.md`,
    `store-listing.md`, `manual-test.md`) with product-specific content, leaving
-   no placeholder or template comment behind.
+   no placeholder or template comment behind. Check the two facts that drift
+   silently: the single-purpose statement matches between `privacy-policy.md`
+   and `store-listing.md`, and the "Data stored" list (with any limits it
+   quotes) matches `src/lib/storage/schema.ts` plus any other persistence in
+   use — the manifest cannot tell you this.
 2. If the extension handles user data (local persistence included), publish the
-   privacy policy at a stable public URL, set that URL in the developer
-   dashboard's privacy fields, and confirm the hosted page matches
+   privacy policy at a stable public URL and confirm the hosted page matches
    `docs/store/privacy-policy.md` at this version — the repository file alone
-   does not satisfy the requirement.
-3. Complete the dashboard's **Privacy practices** form, not just the policy URL:
-   single-purpose description, permission and remote-code justifications,
-   collected data types with usage and sharing, and the certification
-   checkboxes — each matching the submitted build and the three `docs/store/`
-   documents.
-4. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
+   does not satisfy the requirement. Bump the effective date and re-publish on
+   every revision.
+3. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
    directory produced by `npm run package`), not a development build.
-5. Confirm `npm run verify:manifest` passes and that every access-granting entry
-   in `scripts/expected-manifest.config.mjs` has exactly one matching
-   justification in `docs/store/store-listing.md` — no extras on either side.
-   All six verified lists count: `permissions`, `host_permissions`,
+4. Confirm `npm run verify:manifest` passes with no warnings, and that every
+   access-granting entry in `scripts/expected-manifest.config.mjs` has exactly
+   one matching justification in `docs/store/store-listing.md` — no extras on
+   either side. All six verified lists count: `permissions`, `host_permissions`,
    `optional_permissions`, `optional_host_permissions`,
-   `content_scripts[].matches`, and `web_accessible_resources`.
+   `content_scripts[].matches`, and `web_accessible_resources`. Warnings do not
+   fail the command but do block a release (a `displayName` warning means the
+   store name is still the template's).
+5. Confirm every bullet under "Permissions deliberately not requested" in
+   `store-listing.md` is genuinely absent from `manifest.config.ts`.
 6. Prepare the assets listed in that file's "Screenshot checklist".
 
-The store upload itself stays manual and happens after the GitHub Release
-succeeds.
+In the dashboard, before submitting for review — the upload itself stays manual;
+for a version release use the `extension.zip` from the GitHub Release:
+
+1. Upload the package (for a new item this creates it, and precedes the rest).
+2. Set the privacy policy URL to the page published above.
+3. Walk the **Privacy practices** form top to bottom: single-purpose
+   description, permission and remote-code justifications, collected data types
+   with usage and sharing, and the certification checkboxes — each matching the
+   uploaded build and the three `docs/store/` documents. The policy URL fills
+   none of these fields.
+4. Confirm the listing fields (name, short and detailed descriptions, every
+   locale, screenshots) match `store-listing.md`, then submit for review.

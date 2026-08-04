@@ -11,7 +11,10 @@ the publishing checklist in [../releasing.md](../releasing.md).
 
 1. Use the Node.js version pinned in `.nvmrc`.
 2. Run `npm ci`.
-3. Run `npm run verify:full`.
+3. Run `npm run verify:full`, then `npm run package`. The publishing checklist
+   in [../releasing.md](../releasing.md) gates on the packaged build, so
+   `extension/` has to be what `npm run package` produced — `verify:full` alone
+   stops at `npm run build`.
 4. **Before loading the extension**, open `chrome://net-export` in its own tab
    and start a capture. Leave it running for the entire session, then stop it at
    the end and inspect the log with
@@ -81,26 +84,33 @@ not a specification.
 ## Safety checks
 
 <!--
-Keep all four checks. Two of them need product-specific wording:
+Keep all four checks. Three of them need product-specific wording:
 
 - The network check: reword it only if the extension is documented as making
   requests, and then name the exact requests that are expected.
 - The sensitive-input check: it covers password, payment, and credential
   fields; every form the extension touches during the run must be a fixture.
+- The stored-data check: it is deliberately two-sided, because uninstalling does
+  not necessarily delete everything. If the product keeps data server-side, or
+  retains anything for a defined period, name here what is deleted and what
+  survives, matching "Retention and deletion" in ./privacy-policy.md rather than
+  forcing that document to claim a deletion that does not happen.
 -->
 
 - [ ] The network recording covering every extension context (background service
       worker, popup, options page, and each host page running a content script)
       shows no request originated by the extension
-- [ ] `npm run verify:manifest` passes, and the built `extension/manifest.json`
-      declares exactly the permissions, host permissions, optional permissions,
-      optional host permissions, content-script matches, and web-accessible
-      resources justified in [store-listing.md](./store-listing.md) — no more,
-      no less
+- [ ] `npm run verify:manifest` passes with no warnings, and the built
+      `extension/manifest.json` declares exactly the permissions, host
+      permissions, optional permissions, optional host permissions,
+      content-script matches, and web-accessible resources justified in
+      [store-listing.md](./store-listing.md) — no more, no less
 - [ ] No sensitive input was written or submitted by the extension during the
       run
-- [ ] Stored data appears, changes, and disappears as described in
-      [privacy-policy.md](./privacy-policy.md), including after uninstall
+- [ ] Stored data appears and changes as described in
+      [privacy-policy.md](./privacy-policy.md), and after uninstalling, both what
+      is deleted and what is retained — on the device and anywhere the product
+      stores data off it — match its "Retention and deletion" section
 
 ## Compatibility cases
 

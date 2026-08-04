@@ -53,40 +53,72 @@ Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)**
 プライバシー申告は公開リリースと同一である。省略できるのはストアを介さない配布
 (自己ホストの `.zip` / `.crx`、エンタープライズポリシーによる配布)だけである。
 
-タグを付ける前に(手順 1 の一部として)、以下をすべて確認する。
+チェックは 2 つのゲートに分かれる。半数はリポジトリ側では実施できないためである。
+新規アイテムは最初のパッケージをアップロードするまで存在せず、**Privacy practices**・
+プライバシー・掲載情報の各フォームを開くこともできない。アップロードはドラフトの
+作成/更新にすぎず、明示的に審査提出するまでユーザーには一切届かないので、
+初回提出時はフォームを開けるようにする目的だけで先にドラフトをアップロードしてよい。
+
+### 3a. タグ付け前(リポジトリ側)
+
+手順 1 の一部として以下をすべて確認する。ここの項目はすべて、ストアアイテムが
+無くてもローカルで検証できる。
 
 1. `docs/store/` の 3 文書([privacy-policy.md](./store/privacy-policy.md)、
    [store-listing.md](./store/store-listing.md)、
    [manual-test.md](./store/manual-test.md))が当該プロダクトの内容で記入され、
    プレースホルダとテンプレートのコメントがすべて置き換えられていること。
+   気づかないまま古くなりやすい 2 点はここで確認する:
+   [privacy-policy.md](./store/privacy-policy.md) と
+   [store-listing.md](./store/store-listing.md) の single purpose の記述が
+   一致していること、および「Data stored」の一覧(記載した上限値を含む)が
+   実装(`src/lib/storage/schema.ts` と、プロダクトが使う他の永続化)と
+   一致していること。後者は manifest からは判別できない。
 2. ユーザーデータを扱う場合(ローカルに保存するだけの場合も含む)、
-   プライバシーポリシーが安定した公開 URL に掲載され、その URL が
-   デベロッパーダッシュボードのプライバシー欄に設定され、
-   掲載内容が当該バージョンの [privacy-policy.md](./store/privacy-policy.md) と
-   一致していること。リポジトリ内の Markdown を記入するだけでは要件を満たさない。
+   プライバシーポリシーが安定した公開 URL に掲載され、掲載内容が当該バージョンの
+   [privacy-policy.md](./store/privacy-policy.md) と一致していること。
+   リポジトリ内の Markdown を記入するだけでは要件を満たさない。
    審査で読まれるのは公開ページであるため、初回提出前にホスティング先を決め、
-   ポリシー変更時は必ず再掲載する。
-3. ダッシュボードの **Privacy practices** フォームが、URL だけでなく
-   全項目記入済みであること。single purpose の説明、各権限とリモートコードの
-   正当化、収集するデータ種別とその利用目的・共有方針、認証(certification)の
-   チェック項目が、提出するビルドと `docs/store/` の 3 文書に一致している必要がある。
-   公開 URL の設定だけではこれらの項目は 1 つも埋まらず、
-   [privacy-policy.md](./store/privacy-policy.md) 自体がダッシュボード申告との
-   一致を要求しているため、アップロード時ではなくタグ付け前にフォームを
-   上から順に確認する。
-4. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
+   改訂のたびに effective date を更新して再掲載する。
+   (ダッシュボードの URL 欄への設定は [3b](#3b-ダッシュボード上審査提出前) —
+   アイテムが存在しなければその欄も存在しない。)
+3. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
    開発ビルドではなく、`npm run package` が生成した `extension/` ディレクトリを読み込んで実施する。
-5. `npm run verify:manifest` が成功し、`scripts/expected-manifest.config.mjs` の
+4. `npm run verify:manifest` が**警告なしで**成功し、`scripts/expected-manifest.config.mjs` の
    アクセスを与える全エントリが、[store-listing.md](./store/store-listing.md) の
    「Permission justifications」に過不足なく 1 対 1 で対応していること。
    対象は verifier が検証する 6 つのリストすべて — `permissions` /
    `host_permissions` / `optional_permissions` / `optional_host_permissions` /
    `content_scripts[].matches` / `web_accessible_resources`(各エントリの
    `resources` と、それを公開する `matches`)。正当化のないエントリも、
-   宣言していない対象への正当化も残さない。
+   宣言していない対象への正当化も残さない。警告はコマンドを失敗させないが
+   リリースは止める。例えば `displayName` の警告は、ストア掲載名がテンプレートの
+   ままであることを意味する。
+5. [store-listing.md](./store/store-listing.md) の
+   「Permissions deliberately not requested」に挙げた全項目が、
+   `manifest.config.ts` に実在しないこと。実際には宣言している権限をそこに
+   列挙するのは、審査に対する虚偽記載である。
 6. [store-listing.md](./store/store-listing.md) の「Screenshot checklist」に挙げた素材を、
    当該バージョンのビルドから用意していること。
 
-GitHub Release の作成が成功した後、検証済みの `extension.zip` を Chrome Web Store
-デベロッパーダッシュボードから手動でアップロードする。公開は意図的に手動であり、
-Release workflow が Store へアップロードすることはない。
+### 3b. ダッシュボード上、審査提出前
+
+公開は意図的に手動であり、Release workflow が Store へアップロードすることはない。
+このゲートは順番どおりに進める(各手順が次の手順を可能にする、または入力になる)。
+審査提出は最後に行う。
+
+1. パッケージをアップロードする。バージョンリリースでは、手順 2 の GitHub Release に
+   添付された検証済み `extension.zip` を使う。新規アイテムではこのアップロードが
+   アイテム作成そのものであり、必然的にこのゲートの他項目より先に行う。
+   タグ付け前でも構わない。
+2. プライバシーポリシー URL 欄に 3a-2 で公開したページを設定し、
+   保存した URL を実際に開いてそのページに到達することを確認する。
+3. **Privacy practices** フォームを上から順に確認する。single purpose の説明、
+   各権限とリモートコードの正当化、収集するデータ種別とその利用目的・共有方針、
+   認証(certification)のチェック項目。ポリシー URL を設定してもこれらの項目は
+   1 つも埋まらず、[privacy-policy.md](./store/privacy-policy.md) 自体が
+   ダッシュボード申告との一致を要求している。各回答は、アップロードしたビルドと
+   `docs/store/` の 3 文書に一致していなければならない。
+4. 掲載情報(名称、短い説明、詳細説明、全ロケール、アップロード済みスクリーンショット)が
+   [store-listing.md](./store/store-listing.md) と一致していること。
+5. ここまで揃ってから審査に提出する。
