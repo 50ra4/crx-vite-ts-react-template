@@ -84,20 +84,26 @@ Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)**
    アイテムが存在しなければその欄も存在しない。)
 3. [manual-test.md](./store/manual-test.md) をパッケージ済みビルドに対して実施済みであること。
    開発ビルドではなく、`npm run package` が生成した `extension/` ディレクトリを読み込んで実施する。
-4. `npm run verify:manifest` が**警告なしで**成功し、`scripts/expected-manifest.config.mjs` の
-   アクセスを与える全エントリが、[store-listing.md](./store/store-listing.md) の
-   「Permission justifications」に過不足なく 1 対 1 で対応していること。
-   対象は verifier が検証する 6 つのリストすべて — `permissions` /
-   `host_permissions` / `optional_permissions` / `optional_host_permissions` /
+4. `npm run verify:manifest` が**警告なしで**成功し、生成された
+   `extension/manifest.json` のアクセスを与える全エントリが、
+   [store-listing.md](./store/store-listing.md) の「Permission justifications」に
+   過不足なく 1 対 1 で対応していること。対象は verifier が検証する
+   6 つのリストすべて — `permissions` / `host_permissions` /
+   `optional_permissions` / `optional_host_permissions` /
    `content_scripts[].matches` / `web_accessible_resources`(各エントリの
-   `resources` と、それを公開する `matches`)。正当化のないエントリも、
-   宣言していない対象への正当化も残さない。警告はコマンドを失敗させないが
-   リリースは止める。例えば `displayName` の警告は、ストア掲載名がテンプレートの
-   ままであることを意味する。
+   `matches` と、公開しているもの)。正当化のないエントリも、
+   宣言していない対象への正当化も残さない。読むのは項目 3 と同じ
+   `npm run package` が生成した manifest であり、古いビルドを読まない
+   (`verify:manifest` 自身がこのファイルを読み、
+   `scripts/expected-manifest.config.mjs` がその内容を pin している)。
+   警告はコマンドを失敗させないがリリースは止める。例えば `displayName` の
+   警告は、ストア掲載名がテンプレートのままであることを意味する。
 5. [store-listing.md](./store/store-listing.md) の
    「Permissions deliberately not requested」に挙げた全項目が、
-   `manifest.config.ts` に実在しないこと。実際には宣言している権限をそこに
-   列挙するのは、審査に対する虚偽記載である。
+   同じ生成後 manifest に実在しないこと。`manifest.config.ts` を見るのでは
+   代用にならない(ビルドが source に無いエントリを追加する。3a-4 参照)。
+   配布される manifest が宣言している権限を「要求しない」と書くのは、
+   審査に対する虚偽記載である。
 6. [store-listing.md](./store/store-listing.md) の「Screenshot checklist」に挙げた素材を、
    当該バージョンのビルドから用意していること。
 
@@ -107,10 +113,16 @@ Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)**
 このゲートは順番どおりに進める(各手順が次の手順を可能にする、または入力になる)。
 審査提出は最後に行う。
 
-1. パッケージをアップロードする。バージョンリリースでは、手順 2 の GitHub Release に
-   添付された検証済み `extension.zip` を使う。新規アイテムではこのアップロードが
-   アイテム作成そのものであり、必然的にこのゲートの他項目より先に行う。
-   タグ付け前でも構わない。
+1. 審査に出すパッケージをアップロードする。手順 2 の GitHub Release に添付された
+   `extension.zip` がそれであり、CI が検証済みなのはこの成果物だけである
+   (ローカルビルドではない)。
+
+   新規アイテムだけが部分的な例外になる。何かをアップロードするまでアイテムが
+   存在しないため、アイテム作成とフォーム解放のためだけに、タグ付け前へ
+   ローカルビルドのドラフトを上げてよい。これは足場であって提出物ではない。
+   タグの Release が成功したら、そのドラフトを Release の `extension.zip` で
+   上書きし、**差し替え後のビルドに対して手順 2〜4 をやり直す**。足場に対して
+   入力したフォームの値はアップロードしても残り、どこでも再検証されない。
 2. プライバシーポリシー URL 欄に 3a-2 で公開したページを設定し、
    保存した URL を実際に開いてそのページに到達することを確認する。
 3. **Privacy practices** フォームを上から順に確認する。single purpose の説明、
@@ -121,4 +133,10 @@ Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)**
    `docs/store/` の 3 文書に一致していなければならない。
 4. 掲載情報(名称、短い説明、詳細説明、全ロケール、アップロード済みスクリーンショット)が
    [store-listing.md](./store/store-listing.md) と一致していること。
-5. ここまで揃ってから審査に提出する。
+5. ドラフトに入っているパッケージが、足場の残骸ではなく Release 成果物で
+   あることを確認する。ダッシュボードに表示される version / version name が
+   タグと一致し、アップロード済みファイルが Release の `extension.zip` と
+   同一であること。zip は同一ソース・Node.js・lockfile から byte-identical に
+   再生成されるため、ダウンロードした Release アセットとローカルの
+   `npm run package` 出力を `shasum -a 256` で突き合わせれば確実に判定できる。
+6. ここまで揃ってから審査に提出する。

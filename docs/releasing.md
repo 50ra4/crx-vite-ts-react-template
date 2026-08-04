@@ -95,20 +95,25 @@ locally, without a store item.
    build: load the `extension/` directory produced by `npm run package`, not a
    development build.
 4. `npm run verify:manifest` passes **and prints no warnings**, and every
-   access-granting entry in `scripts/expected-manifest.config.mjs` has exactly
-   one matching justification in the "Permission justifications" section of
+   access-granting entry in the built `extension/manifest.json` has exactly one
+   matching justification in the "Permission justifications" section of
    [store-listing.md](./store/store-listing.md) — no unjustified entry, and no
    justification for something that is not declared. That covers all six lists
    the verifier checks: `permissions`, `host_permissions`,
    `optional_permissions`, `optional_host_permissions`,
    `content_scripts[].matches`, and `web_accessible_resources` (each entry's
-   `resources` and the `matches` it is exposed to). Warnings do not fail the
-   command but do block a release: the `displayName` warning, for instance,
-   means the store name is still the template's.
+   `matches` and what it exposes). Read the manifest produced by the same
+   `npm run package` run as item 3, never an older build — `verify:manifest`
+   itself reads that file, and `scripts/expected-manifest.config.mjs` is what
+   pins it. Warnings do not fail the command but do block a release: the
+   `displayName` warning, for instance, means the store name is still the
+   template's.
 5. Every bullet in the "Permissions deliberately not requested" section of
-   [store-listing.md](./store/store-listing.md) is absent from
-   `manifest.config.ts`. A permission listed there that the manifest actually
-   declares is a false statement to a reviewer.
+   [store-listing.md](./store/store-listing.md) is absent from that same built
+   manifest. Checking `manifest.config.ts` instead is not equivalent — the build
+   adds entries the source file never declares (see 3a-4) — and a permission
+   listed as not requested while the shipped manifest declares it is a false
+   statement to a reviewer.
 6. The assets named in the "Screenshot checklist" section of
    [store-listing.md](./store/store-listing.md) are prepared from this
    version's build.
@@ -119,10 +124,17 @@ Publishing stays manual by design; the release workflow never uploads to the
 store. Work through this gate in order — each step unlocks or feeds the next —
 and submit for review only at the end.
 
-1. Upload the package. For a version release this is the verified
-   `extension.zip` from the GitHub Release created in step 2. For a brand-new
-   item, the upload is what creates the item, so it necessarily precedes the
-   rest of this gate and may happen before tagging.
+1. Upload the package that will be reviewed: the `extension.zip` attached to the
+   GitHub Release created in step 2. That artifact — not a local build — is the
+   only one CI has verified.
+
+   A brand-new item is the exception, and only partly: the item does not exist
+   until something is uploaded, so a locally built draft may go up before
+   tagging purely to create the item and open the forms. It is scaffolding, not
+   a submission. Once the tag's Release succeeds, upload the Release's
+   `extension.zip` over that draft, then **redo steps 2–4 against the replaced
+   build** — the form values entered against the scaffold survive the upload and
+   are not re-validated by anything.
 2. Set the privacy policy URL to the page published in 3a-2, and open the URL as
    saved to confirm it resolves to that page.
 3. Walk the **Privacy practices** form top to bottom: the single-purpose
@@ -135,4 +147,10 @@ and submit for review only at the end.
 4. The listing fields — name, short description, detailed description, every
    locale, and the uploaded screenshots — match
    [store-listing.md](./store/store-listing.md).
-5. Only then submit for review.
+5. Confirm the package now sitting in the draft is the Release artifact, not a
+   leftover scaffold: the version and version name shown in the dashboard equal
+   the tag, and the uploaded file matches the Release's `extension.zip`. The zip
+   is byte-identical when rebuilt from the same source, Node.js version, and
+   lockfile, so `shasum -a 256` on the downloaded Release asset and on a local
+   `npm run package` output is a definitive check.
+6. Only then submit for review.

@@ -64,21 +64,29 @@ Before tagging (all verifiable locally):
 3. Run `docs/store/manual-test.md` against the packaged build (the `extension/`
    directory produced by `npm run package`), not a development build.
 4. Confirm `npm run verify:manifest` passes with no warnings, and that every
-   access-granting entry in `scripts/expected-manifest.config.mjs` has exactly
-   one matching justification in `docs/store/store-listing.md` — no extras on
-   either side. All six verified lists count: `permissions`, `host_permissions`,
+   access-granting entry in the built `extension/manifest.json` — the one from
+   the same `npm run package` run as item 3 — has exactly one matching
+   justification in `docs/store/store-listing.md`, no extras on either side. All
+   six verified lists count: `permissions`, `host_permissions`,
    `optional_permissions`, `optional_host_permissions`,
-   `content_scripts[].matches`, and `web_accessible_resources`. Warnings do not
-   fail the command but do block a release (a `displayName` warning means the
-   store name is still the template's).
+   `content_scripts[].matches`, and `web_accessible_resources`. Justify against
+   the built manifest, never `manifest.config.ts`: the build adds entries the
+   source declares nowhere (by default CRXJS emits a `web_accessible_resources`
+   entry for the content-script chunks). `scripts/expected-manifest.config.mjs`
+   pins the built file; warnings do not fail the command but do block a release
+   (a `displayName` warning means the store name is still the template's).
 5. Confirm every bullet under "Permissions deliberately not requested" in
-   `store-listing.md` is genuinely absent from `manifest.config.ts`.
+   `store-listing.md` is genuinely absent from that built manifest.
 6. Prepare the assets listed in that file's "Screenshot checklist".
 
-In the dashboard, before submitting for review — the upload itself stays manual;
-for a version release use the `extension.zip` from the GitHub Release:
+In the dashboard, before submitting for review — the upload stays manual:
 
-1. Upload the package (for a new item this creates it, and precedes the rest).
+1. Upload the reviewed package: the `extension.zip` attached to the GitHub
+   Release, the only artifact CI verified. A brand-new item may take a local
+   draft build before tagging, purely to create the item and open the forms;
+   that scaffold must be overwritten with the Release's `extension.zip` once the
+   tag ships, and steps 2-4 redone against the replaced build (form values
+   entered against the scaffold survive and are re-validated by nothing).
 2. Set the privacy policy URL to the page published above.
 3. Walk the **Privacy practices** form top to bottom: single-purpose
    description, permission and remote-code justifications, collected data types
@@ -86,4 +94,7 @@ for a version release use the `extension.zip` from the GitHub Release:
    uploaded build and the three `docs/store/` documents. The policy URL fills
    none of these fields.
 4. Confirm the listing fields (name, short and detailed descriptions, every
-   locale, screenshots) match `store-listing.md`, then submit for review.
+   locale, screenshots) match `store-listing.md`.
+5. Confirm the package in the draft is the Release artifact — dashboard version
+   equals the tag, and `shasum -a 256` of the uploaded zip matches the Release
+   asset (the build is reproducible) — then submit for review.

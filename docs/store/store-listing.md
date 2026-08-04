@@ -24,16 +24,23 @@ statement.
 ## Permission justifications
 
 <!--
-Mirror `manifest.config.ts` one-to-one. Every entry in
-`content_scripts[].matches`, `permissions`, `host_permissions`,
+Mirror the **built** `extension/manifest.json` one-to-one — the file
+`npm run package` produces, which is what gets uploaded and reviewed. Do not
+mirror `manifest.config.ts`: the build adds entries the source file never
+declares. In the default template, `manifest.config.ts` declares no
+`web_accessible_resources` at all, yet CRXJS emits one entry exposing the
+content-script chunks; writing this section from the source manifest therefore
+omits a real grant.
+
+Every entry in `content_scripts[].matches`, `permissions`, `host_permissions`,
 `optional_permissions`, `optional_host_permissions`, and
 `web_accessible_resources` gets exactly one subsection below, and no subsection
 may describe an entry that is not declared. Optional permissions need a
 justification even though the user is prompted at grant time — the reviewer sees
 them in the manifest either way.
-`scripts/expected-manifest.config.mjs` holds the same lists, so
-`npm run verify:manifest` is what proves the manifest itself has not drifted;
-keeping this section aligned with that file is a manual step in the release
+`scripts/expected-manifest.config.mjs` pins those same lists, so
+`npm run verify:manifest` is what proves the built manifest has not drifted;
+keeping this section aligned with it is a manual step in the release
 checklist (see ../releasing.md).
 
 If the extension declares no Chrome API permissions at all, do not delete this
@@ -61,14 +68,21 @@ content-script match only or also a `host_permissions` grant, since reviewers
 treat those differently.
 -->
 
-### Web-accessible resources: <!-- resource path -->
+### Web-accessible resources: <!-- what this entry exposes -->
 
 <!--
-Duplicate this heading once per `web_accessible_resources[].resources` entry —
-including when the extension declares no content scripts, since a resource can
-be exposed without one. Name the `matches` (or `extension_ids`) it is exposed
-to, why the page needs to reach it, and what may and may not cross that
-boundary. Delete this heading only if `web_accessible_resources` is empty.
+Duplicate this heading once per `web_accessible_resources` **entry** in the built
+manifest — not once per file inside `resources`. Those file names are
+build-generated and content-hashed (`assets/sample.tsx-Cwyi8D8p.js`), so they
+change on every build; a justification pinned to them is stale immediately.
+Describe the entry instead: the `matches` (or `extension_ids`) it is exposed to,
+what kind of resources it covers, why the page has to reach them, and what may
+and may not cross that boundary.
+
+The default build has one such entry even though `manifest.config.ts` declares
+none — CRXJS emits it for the content script's loader chunks. Delete this
+heading only when the built manifest has no `web_accessible_resources` at all,
+which for a build with any content script it normally will not.
 -->
 
 ### <!-- permission name -->
@@ -93,9 +107,10 @@ the broad permissions a reviewer might expect and this extension does not take.
 
 List only permissions that are plausible for this product to want — naming
 permissions nobody would expect adds noise instead of trust. Every bullet must
-be verified absent from `manifest.config.ts` before publishing; a permission
-listed here that the manifest actually declares is a false statement to a
-reviewer.
+be verified absent from the built `extension/manifest.json` before publishing —
+the shipped manifest, not `manifest.config.ts`, since the build adds entries the
+source file does not declare. A permission listed here that the shipped manifest
+actually declares is a false statement to a reviewer.
 
 Reference example (do not paste verbatim — keep only what applies to this
 product): a content-script extension that requests no host permissions might

@@ -99,15 +99,17 @@ which data does and does not cross that boundary.
 
 <!--
 Do not restate the permission justifications here — keep one source of truth so
-the two documents cannot drift apart. A sentence naming the declared
-permissions (including the optional ones) and content-script matches at a high
-level is enough, followed by:
+the two documents cannot drift apart. A sentence naming the declared permissions
+(including the optional ones), the content-script matches, and anything exposed
+through `web_accessible_resources` at a high level is enough, followed by:
 
   See [store-listing.md](./store-listing.md) for the justification of each
   permission and content-script match.
 
-Both documents must mirror what `manifest.config.ts` actually declares, which
-`scripts/expected-manifest.config.mjs` and `npm run verify:manifest` pin down.
+Both documents mirror the built `extension/manifest.json` — what actually ships,
+which `scripts/expected-manifest.config.mjs` and `npm run verify:manifest` pin
+down. Not `manifest.config.ts`: the build adds entries that source file never
+declares, `web_accessible_resources` among them.
 -->
 
 ## Third-party code
