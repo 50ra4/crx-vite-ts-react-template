@@ -131,10 +131,29 @@ and submit for review only at the end.
    A brand-new item is the exception, and only partly: the item does not exist
    until something is uploaded, so a locally built draft may go up before
    tagging purely to create the item and open the forms. It is scaffolding, not
-   a submission. Once the tag's Release succeeds, upload the Release's
-   `extension.zip` over that draft, then **redo steps 2–4 against the replaced
-   build** — the form values entered against the scaffold survive the upload and
-   are not re-validated by anything.
+   a submission, and it must carry a **placeholder version below the release
+   version** so the two are distinguishable in the dashboard:
+
+   ```sh
+   npm version 0.0.1 --no-git-tag-version
+   npm run package
+   git checkout -- package.json package-lock.json
+   ```
+
+   Never build the scaffold at the version you are about to release. The
+   dashboard exposes the package version and little else, so a scaffold sharing
+   the release version makes a forgotten replacement indistinguishable from a
+   completed one. That build also overwrites `extension/` and `extension.zip`
+   with placeholder-version artifacts, so re-run `npm run package` after
+   restoring the version files — 3a-3 through 3a-5 must not be evaluated
+   against the scaffold build.
+
+   Once the tag's Release succeeds, upload the Release's `extension.zip` over
+   the scaffold and watch the displayed version change from `0.0.1` to the
+   release version — that transition is the only in-dashboard evidence that the
+   replacement happened. Then **redo steps 2–4 against the replaced build**: the
+   form values entered against the scaffold survive the upload and are
+   re-validated by nothing.
 2. Set the privacy policy URL to the page published in 3a-2, and open the URL as
    saved to confirm it resolves to that page.
 3. Walk the **Privacy practices** form top to bottom: the single-purpose
@@ -148,9 +167,19 @@ and submit for review only at the end.
    locale, and the uploaded screenshots — match
    [store-listing.md](./store/store-listing.md).
 5. Confirm the package now sitting in the draft is the Release artifact, not a
-   leftover scaffold: the version and version name shown in the dashboard equal
-   the tag, and the uploaded file matches the Release's `extension.zip`. The zip
-   is byte-identical when rebuilt from the same source, Node.js version, and
-   lockfile, so `shasum -a 256` on the downloaded Release asset and on a local
-   `npm run package` output is a definitive check.
+   leftover scaffold:
+   - The version and version name shown in the dashboard equal the tag.
+   - If a scaffold was used, you **observed** the version change from the
+     placeholder to the release version during step 1. Finding the release
+     version there is not the same evidence: a scaffold built after the version
+     bump would show it too.
+   - The file you uploaded is the Release asset itself — downloaded from the
+     Release, not rebuilt locally and not re-picked from an old path.
+
+   `shasum -a 256` on the downloaded Release asset and on a local
+   `npm run package` output proves the Release artifact is the reproducible,
+   CI-verified build — it says nothing about which file the dashboard holds,
+   because the uploaded package cannot be read back out. The observed version
+   transition and your own upload of that exact file are what connect the two,
+   which is why the scaffold must never carry the release version.
 6. Only then submit for review.
