@@ -45,6 +45,8 @@ For prereleases, keep the package version and the tag in sync, e.g.
 `1.1.0-rc.1` / `v1.1.0-rc.1`. If the tag and the `package.json` version do not
 match, the Release workflow fails. The Chrome manifest records the numeric
 core in `version` (`1.1.0`) and the full prerelease string in `version_name`.
+That collapsing is why prereleases are a GitHub Release and manual-distribution
+mechanism only — they cannot be submitted to the store; see step 3.
 
 After the tag is pushed, GitHub Actions runs the type check, lint, unit tests,
 manifest verification, and the real-Chromium E2E. Only if everything passes is
@@ -58,6 +60,18 @@ Complete this for every release submitted to the Chrome Web Store, including
 search, so it goes through the same review, listing information, and privacy
 declarations as a public listing. Only distribution that never touches the store
 — a self-hosted `.zip`/`.crx` or an enterprise-policy install — can skip it.
+
+**Submit stable versions only.** `scripts/manifest-version.mjs` strips the
+prerelease suffix, so `1.1.0-rc.1`, `1.1.0-rc.2`, and the final `1.1.0` all ship
+manifest `version` `1.1.0` and differ only in `version_name`, which the store
+ignores for ordering. Since every uploaded package must carry a higher version
+than the one before it, submitting `1.1.0-rc.1` burns `1.1.0` and the store then
+rejects both the next rc and the final release. Use prerelease tags for GitHub
+Releases and manual installs; tag a stable version for anything that goes to the
+store. A product that genuinely needs a store-visible prerelease channel has to
+give each submission its own increasing manifest version — a fourth component,
+for example — which means changing that version derivation, and is a
+product-level decision this template does not make.
 
 The checks come in two gates because half of them cannot be performed in the
 repository. A new store item does not exist — and its **Privacy practices**,
@@ -168,7 +182,9 @@ and submit for review only at the end.
    [store-listing.md](./store/store-listing.md).
 5. Confirm the package now sitting in the draft is the Release artifact, not a
    leftover scaffold:
-   - The version and version name shown in the dashboard equal the tag.
+   - The version shown in the dashboard equals the tag's version. (A stable
+     build carries no `version_name`; if the dashboard shows one, the package is
+     a prerelease and must not be submitted at all — see the top of step 3.)
    - If a scaffold was used, you **observed** the version change from the
      placeholder to the release version during step 1. Finding the release
      version there is not the same evidence: a scaffold built after the version

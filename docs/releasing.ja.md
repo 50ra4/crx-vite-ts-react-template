@@ -42,6 +42,8 @@ git push origin v1.1.0
 プレリリースは package version とタグの両方を `1.1.0-rc.1` / `v1.1.0-rc.1`
 のように一致させる。タグと `package.json` の version が一致しない場合、Release workflow は失敗する。
 Chrome Manifest の `version` には数値部分 (`1.1.0`)、`version_name` には完全なプレリリース版を記録する。
+この数値部分への畳み込みがあるため、プレリリースは GitHub Release と手動配布のための
+仕組みであり、Store には提出できない(手順 3 を参照)。
 
 タグ push 後、GitHub Actions が type check、lint、unit test、manifest 検証、実 Chromium E2E を実行する。
 すべて成功した場合だけ、自動生成ノートと `extension.zip` を含む GitHub Release が作成される。
@@ -52,6 +54,17 @@ Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)**
 限定公開は検索結果に表示されないだけのストア公開形態であり、審査・掲載情報・
 プライバシー申告は公開リリースと同一である。省略できるのはストアを介さない配布
 (自己ホストの `.zip` / `.crx`、エンタープライズポリシーによる配布)だけである。
+
+**提出できるのは stable version だけである。** `scripts/manifest-version.mjs` は
+プレリリース接尾辞を落とすため、`1.1.0-rc.1`・`1.1.0-rc.2`・正式版 `1.1.0` は
+いずれも manifest `version` が `1.1.0` になり、違いは Store が順序判定に使わない
+`version_name` だけになる。アップロードするパッケージは常に直前より大きい version を
+要求されるので、`1.1.0-rc.1` を提出すると `1.1.0` を使い切ってしまい、次の rc も
+正式版も Store に受け付けられなくなる。プレリリースのタグは GitHub Release と
+手動インストール用に使い、Store へ出すものは stable version でタグを打つ。
+Store 上にプレリリースチャネルが本当に必要なプロダクトは、提出ごとに増加する
+manifest version(例えば 4 つ目の要素)を割り当てる必要があり、それは version
+導出の変更を伴うプロダクト固有の判断であって、このテンプレートは行わない。
 
 チェックは 2 つのゲートに分かれる。半数はリポジトリ側では実施できないためである。
 新規アイテムは最初のパッケージをアップロードするまで存在せず、**Privacy practices**・
@@ -153,7 +166,9 @@ Chrome Web Store に提出するリリースでは、**限定公開 (unlisted)**
    [store-listing.md](./store/store-listing.md) と一致していること。
 5. ドラフトに入っているパッケージが、足場の残骸ではなく Release 成果物で
    あることを確認する。
-   - ダッシュボードに表示される version / version name がタグと一致すること。
+   - ダッシュボードに表示される version がタグの version と一致すること
+     (stable ビルドに `version_name` は無い。表示されている場合、そのパッケージは
+     プレリリースであり、そもそも提出してはならない。手順 3 冒頭を参照)。
    - 足場を使った場合、手順 1 で version がプレースホルダからリリース版へ
      変わるのを**実際に見ている**こと。そこにリリース版が表示されていることは
      同じ証拠にならない。version 更新後に作った足場も同じ表示になる。

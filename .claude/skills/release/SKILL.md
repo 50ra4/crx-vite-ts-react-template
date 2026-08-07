@@ -34,7 +34,9 @@ Bump `version` in `package.json`; no separate manifest edit is needed. Stable
 versions are copied to manifest `version`. Prereleases use the numeric SemVer
 core for `version` and the complete package version for `version_name`. Follow
 `docs/releasing.md`; use `npm version <version> --no-git-tag-version` to keep
-`package-lock.json` aligned.
+`package-lock.json` aligned. Because the prerelease suffix is stripped,
+`1.1.0-rc.1`, `1.1.0-rc.2`, and `1.1.0` all ship manifest version `1.1.0` — fine
+for GitHub Releases, disqualifying for the store (phase (e)).
 
 **(e) Store publishing checklist:**
 
@@ -42,6 +44,13 @@ For every release submitted to the Chrome Web Store, **including unlisted ones**
 — unlisted is a store distribution hidden from search, subject to the same
 review, listing information, and privacy declarations. Only distribution outside
 the store (self-hosted `.zip`/`.crx`, enterprise policy) skips this phase.
+
+Submit stable versions only. The store orders uploads by manifest `version` and
+ignores `version_name`, so submitting `1.1.0-rc.1` consumes `1.1.0` and gets the
+next rc and the final release rejected. A store-visible prerelease channel would
+need a distinct increasing manifest version per submission (a fourth component,
+say), i.e. a change to `scripts/manifest-version.mjs` this template does not make.
+
 Follow "Chrome Web Store publishing checklist" in `docs/releasing.md`. It is two
 gates, because the dashboard's privacy and listing forms do not exist until a
 first package upload creates the item; an upload only creates or updates a
@@ -102,7 +111,8 @@ In the dashboard, before submitting for review — the upload stays manual:
 4. Confirm the listing fields (name, short and detailed descriptions, every
    locale, screenshots) match `store-listing.md`.
 5. Confirm the package in the draft is the Release artifact: the dashboard
-   version equals the tag, the placeholder-to-release version transition was
+   version equals the tag (a stable build has no `version_name`; seeing one
+   means a prerelease slipped in), the placeholder-to-release transition was
    observed in step 1 when a scaffold was used, and the file uploaded was the
    downloaded Release asset. `shasum -a 256` of that asset against a local
    `npm run package` output proves the Release build is reproducible and
