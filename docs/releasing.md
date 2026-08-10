@@ -149,18 +149,25 @@ and submit for review only at the end.
    version** so the two are distinguishable in the dashboard:
 
    ```sh
+   RELEASE_VERSION="$(node -p "require('./package.json').version")"
    npm version 0.0.1 --no-git-tag-version
-   npm run package
-   git checkout -- package.json package-lock.json
+   npm run package                                   # the scaffold to upload
+   npm version "$RELEASE_VERSION" --no-git-tag-version
+   npm run package                                   # back to the release build
    ```
+
+   Save and restore the release version explicitly, as above. Do not restore
+   with `git checkout -- package.json package-lock.json`: step 1's bump may
+   still be uncommitted, and that would silently revert to the previous
+   version, leaving 3a and the tag to disagree.
 
    Never build the scaffold at the version you are about to release. The
    dashboard exposes the package version and little else, so a scaffold sharing
    the release version makes a forgotten replacement indistinguishable from a
-   completed one. That build also overwrites `extension/` and `extension.zip`
-   with placeholder-version artifacts, so re-run `npm run package` after
-   restoring the version files — 3a-3 through 3a-5 must not be evaluated
-   against the scaffold build.
+   completed one. The scaffold build also overwrites `extension/` and
+   `extension.zip`, which is why the final `npm run package` above is not
+   optional — 3a-3 through 3a-5 must not be evaluated against the scaffold
+   build.
 
    Once the tag's Release succeeds, upload the Release's `extension.zip` over
    the scaffold and watch the displayed version change from `0.0.1` to the

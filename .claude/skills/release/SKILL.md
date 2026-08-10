@@ -93,12 +93,20 @@ In the dashboard, before submitting for review — the upload stays manual:
 1. Upload the reviewed package: the `extension.zip` attached to the GitHub
    Release, the only artifact CI verified. A brand-new item may take a local
    draft build before tagging, purely to create the item and open the forms.
-   Build that scaffold at a placeholder version below the release version
-   (`npm version 0.0.1 --no-git-tag-version && npm run package`, then
-   `git checkout -- package.json package-lock.json`, then `npm run package`
-   again so `extension/` is back at the release version) — never at the release
-   version, or a forgotten replacement looks exactly like a completed one in the
-   dashboard. Once the tag ships, overwrite the scaffold with the Release's
+   Build that scaffold at a placeholder version below the release version —
+   never at the release version, or a forgotten replacement looks exactly like a
+   completed one in the dashboard. Save the release version first and restore it
+   by value; `git checkout -- package.json package-lock.json` would discard an
+   uncommitted bump from phase (d):
+
+   ```sh
+   RELEASE_VERSION="$(node -p "require('./package.json').version")"
+   npm version 0.0.1 --no-git-tag-version && npm run package   # scaffold
+   npm version "$RELEASE_VERSION" --no-git-tag-version && npm run package
+   ```
+
+   The second `npm run package` is required: the scaffold build overwrote
+   `extension/`, which the before-tagging checks read. Once the tag ships, overwrite the scaffold with the Release's
    `extension.zip`, watch the displayed version change from the placeholder, and
    redo steps 2-4 against the replaced build (form values entered against the
    scaffold survive and are re-validated by nothing).

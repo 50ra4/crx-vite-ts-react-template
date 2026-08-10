@@ -137,17 +137,24 @@ manifest version(例えば 4 つ目の要素)を割り当てる必要があり�
    version** で作る:
 
    ```sh
+   RELEASE_VERSION="$(node -p "require('./package.json').version")"
    npm version 0.0.1 --no-git-tag-version
-   npm run package
-   git checkout -- package.json package-lock.json
+   npm run package                                   # アップロードする足場
+   npm version "$RELEASE_VERSION" --no-git-tag-version
+   npm run package                                   # リリース版のビルドに戻す
    ```
+
+   上記のようにリリース版の値を明示的に退避・復元すること。
+   `git checkout -- package.json package-lock.json` で戻してはならない。
+   手順 1 のバージョン更新がまだコミットされていない場合、それは旧バージョンへ
+   黙って巻き戻し、3a の検証とタグが食い違う結果になる。
 
    これから公開する version のまま足場を作ってはならない。ダッシュボードから
    分かるのは実質パッケージの version だけであり、足場が同じ version を持つと
-   「差し替え忘れ」と「差し替え済み」が区別できなくなる。なおこのビルドは
-   `extension/` と `extension.zip` をプレースホルダ version の成果物で
-   上書きするため、version ファイルを復元した後に `npm run package` を
-   実行し直すこと。3a-3〜3a-5 を足場ビルドに対して評価してはならない。
+   「差し替え忘れ」と「差し替え済み」が区別できなくなる。足場のビルドは
+   `extension/` と `extension.zip` も上書きするため、上記の最後の
+   `npm run package` は省略できない。3a-3〜3a-5 を足場ビルドに対して
+   評価してはならない。
 
    タグの Release が成功したら、足場を Release の `extension.zip` で上書きし、
    表示される version が `0.0.1` からリリース版へ変わることを確認する。この
