@@ -35,5 +35,22 @@ Checklist:
   `npm run dev`. Install Chromium once with
   `npx playwright install chromium` if Playwright has not downloaded it yet.
 - **`README.md`**: rewrite for the real project (current one describes the template itself).
+- **`docs/store/`**: rewrite the three Chrome Web Store templates
+  (`privacy-policy.md`, `store-listing.md`, `manual-test.md`) for the real
+  product, replacing every placeholder and HTML comment — they ship as blank
+  forms, not as usable copy. Their permission sections must match the built
+  `extension/manifest.json` (run `npm run package` first), not
+  `manifest.config.ts` — the build adds entries the source never declares, e.g.
+  CRXJS emits a `web_accessible_resources` entry for content-script chunks that
+  `manifest.config.ts` does not mention. Do this after the permission review
+  above. The stored-data sections are reconciled against the implementation:
+  `manifest.config.ts` only reveals whether the `storage` permission is held —
+  not which values are stored, in which area, or for how long. Inventory every
+  key in `src/lib/storage/schema.ts` together with its `area` (the template's
+  defaults use `sync`), add any other persistence the product introduces
+  (IndexedDB, `localStorage` / `sessionStorage`, cookies, `chrome.storage` calls
+  outside the schema), and describe that union in `privacy-policy.md`. See
+  `.claude/skills/release/SKILL.md` phase (e) for when these documents gate a
+  release.
 - **After cleanup, confirm CI still passes locally**: `npm run check-type`,
   `npm run build`, `npm test`.
