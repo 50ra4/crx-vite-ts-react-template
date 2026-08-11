@@ -1,56 +1,186 @@
 ---
 name: adapt-template
-description: Turn this template into a real Chrome extension project. Use when starting a new extension from this repo (rename, clean samples, adjust manifest permissions).
+description: Turn this template into a product Chrome extension by selecting and pruning surfaces, replacing samples, setting product identity and manifest expectations, auditing inherited documentation, and proving the result with the full verification suite. Use whenever deriving a real extension from this repository, including requests to remove popup/options/background/content surfaces or rename and productize the template.
 ---
 
-Checklist:
+# Adapt the template
 
-- **`package.json`**: update `name` (the kebab-case npm package identifier),
-  `displayName` (the human-readable Chrome product name), `description`,
-  `repository`, `bugs`, `homepage`, `author`. `manifest.config.ts` derives the
-  extension `name` from `displayName` and its version from `version`.
-  `npm run verify:manifest` warns while `displayName` still has the template
-  default.
-- **`manifest.config.ts`**: fill in `description` (currently empty), review
-  `permissions` (currently just `['storage']`), and review
-  `content_scripts[].matches` — the template ships with a sample match on
-  `https://example.com/*`. When changing that match, update the production URL
-  and host-permission values in `e2e/extension.spec.ts` so its intercepted page
-  is still covered.
-- **Delete or replace sample code**: `src/examples/` collects everything
-  disposable — delete the whole directory in one shot, or replace pieces
-  individually:
-  - `src/examples/components/SampleComponent.tsx` + its `.test.tsx`
-  - `src/examples/hooks/useIncrement.ts` + its `.test.ts`
-  - `src/examples/utils/calc.ts` + its `.test.ts`
-  - `src/entrypoints/content/sample.tsx` — also remove its `content_scripts[]`
-    entry in `manifest.config.ts`
-- **Remove unused surfaces**: if you don't need e.g. the options page, delete
-  the HTML file, the `src/entrypoints/<surface>/<name>.tsx` file, and the
-  matching key in `manifest.config.ts` together (see `.claude/skills/add-entrypoint/SKILL.md`
-  for what the three wiring points are).
-- **Icons**: replace `assets/branding/icon.svg` and `icon-dev.svg`, then run
-  `npm run render:icons` to regenerate the 16/48/128 px PNG files under
-  `public/logo/`. The development variants keep the `-dev` suffix used by
-  `npm run dev`. Install Chromium once with
-  `npx playwright install chromium` if Playwright has not downloaded it yet.
-- **`README.md`**: rewrite for the real project (current one describes the template itself).
-- **`docs/store/`**: rewrite the three Chrome Web Store templates
-  (`privacy-policy.md`, `store-listing.md`, `manual-test.md`) for the real
-  product, replacing every placeholder and HTML comment — they ship as blank
-  forms, not as usable copy. Their permission sections must match the built
-  `extension/manifest.json` (run `npm run package` first), not
-  `manifest.config.ts` — the build adds entries the source never declares, e.g.
-  CRXJS emits a `web_accessible_resources` entry for content-script chunks that
-  `manifest.config.ts` does not mention. Do this after the permission review
-  above. The stored-data sections are reconciled against the implementation:
-  `manifest.config.ts` only reveals whether the `storage` permission is held —
-  not which values are stored, in which area, or for how long. Inventory every
-  key in `src/lib/storage/schema.ts` together with its `area` (the template's
-  defaults use `sync`), add any other persistence the product introduces
-  (IndexedDB, `localStorage` / `sessionStorage`, cookies, `chrome.storage` calls
-  outside the schema), and describe that union in `privacy-policy.md`. See
-  `.claude/skills/release/SKILL.md` phase (e) for when these documents gate a
-  release.
-- **After cleanup, confirm CI still passes locally**: `npm run check-type`,
-  `npm run build`, `npm test`.
+Treat adaptation as a subtraction-first migration. A derived product should retain
+only the surfaces and shared layers it uses; leaving a working sample in place makes
+tests pass for behavior the product does not ship.
+
+## 1. Record the product contract
+
+Before deleting files, record these decisions in the task or implementation plan:
+
+- npm `name`, Chrome `displayName`, one-sentence description, author, and repository
+  URL
+- initial version (use `0.1.0` unless the product already has a version policy)
+- retained surfaces: popup, options, background service worker, content script
+- whether a toolbar `action` is needed without a popup
+- production URL matches and the minimum Chrome permissions
+- every persistence mechanism and stored value, not just `chrome.storage`
+- intended distribution (local/enterprise, GitHub Release, or Chrome Web Store)
+
+Read `.claude/rules/typescript-react.md` before editing TypeScript or TSX,
+`.claude/rules/chrome-extension.md` before changing the manifest/background/content
+script, and `.claude/rules/testing.md` before replacing tests.
+
+Run `npm ci` and `npm run verify:full` before adaptation. A failing baseline must be
+understood first; otherwise pruning can hide an existing defect.
+
+## 2. Select and prune surfaces
+
+Delete a surface as one unit. Its source, HTML wiring, manifest declaration,
+manifest expectation, E2E coverage, development links, screenshots, and prose must
+agree; deleting only the entrypoint leaves either a broken build or a false contract.
+
+| Surface | Keep or replace | Remove when unused | Manifest and expectation |
+| --- | --- | --- | --- |
+| popup | `popup.html`, `src/entrypoints/popup/popup.tsx` | both files; popup link in `index.html`; `docs/images/popup.png` when no longer documented | Remove `action.default_popup`. If no toolbar action remains, remove `action` and set `surfaces.action` to `{ present: false, default_popup: false }`. If an action remains without a popup, keep `action: {}` and expect `{ present: true, default_popup: false }`. |
+| options | `options.html`, `src/entrypoints/options/options.tsx` | both files; options link in `index.html`; `docs/images/options.png` when no longer documented | Remove `options_ui` and set `surfaces.options_ui` to `false`. |
+| background | `src/entrypoints/background/background.ts` | the entrypoint and product E2E assertions for its service worker | Remove `background` and set `surfaces.background` to `false`. |
+| content | Replace `src/entrypoints/content/sample.tsx` with a product-named entrypoint | the sample entrypoint and content-specific E2E routes/assertions | Replace or remove `content_scripts`; mirror its entries in expected `content_scripts` and the CRXJS-generated `web_accessible_resources`. |
+
+Use the following complete pruning sets for the three common product shapes. In all
+three, delete `src/examples/` and replace `e2e/extension.spec.ts` with product
+behavior; do not keep the template's cross-configuration sample tests as product
+coverage.
+
+| Product shape | Delete | Expected surfaces/content |
+| --- | --- | --- |
+| content only | `popup.html`, `options.html`, popup/options/background entrypoints, their `index.html` links and obsolete screenshots | action/options/background false; keep only the product content entry and matching web-accessible-resource expectation |
+| content + background | `popup.html`, `options.html`, popup/options entrypoints, their `index.html` links and obsolete screenshots | action/options false, background true; keep product content and background expectations |
+| popup + options | background/content entrypoints and content-only documentation | action present with popup, options true, background false; set expected `content_scripts` and `web_accessible_resources` to `[]` |
+
+After removing the popup/options links, keep `index.html` only if it remains a useful
+development landing page; otherwise remove it and confirm the build has no dependency
+on it.
+
+### Prune shared sample layers by usage
+
+Do not infer shared-layer usage from the chosen surface names. Search imports and API
+use after the product entrypoints are in place:
+
+- Keep `src/lib/messaging/` only when two retained extension contexts communicate.
+  Replace the `greet` contract and its tests with product messages. If messaging is
+  unused, delete the whole layer and remove messaging prose from `src/lib/README.md`
+  and `AGENTS.md`.
+- Keep `src/lib/storage/` only when the product persists settings or state. Replace
+  `exampleSetting` and its tests with the product schema. If storage is unused, delete
+  the layer and remove the `storage` permission and documentation.
+- Keep `src/lib/testing/chromeFake.ts` when retained unit tests need its runtime or
+  storage fake. Delete it and its test only after all imports and Chrome-dependent
+  unit tests are gone.
+
+Run `npm run verify` after surface and shared-layer pruning. Fix the selected product
+shape; do not restore sample code merely to make a check pass.
+
+## 3. Set product identity
+
+Update all of the following in `package.json`:
+
+- `name`, `displayName`, `version`, `description`, `keywords`, `author`
+- `repository.url`, `bugs.url`, and `homepage`
+
+Start a new product at `0.1.0`. Synchronize the root `name` and `version` in
+`package-lock.json`; `npm install --package-lock-only --ignore-scripts` is preferred
+after editing package metadata. `manifest.config.ts` derives the Chrome name from
+`displayName` and the manifest version from the package version.
+
+Then update:
+
+- `manifest.config.ts` description, least-privilege permissions, production matches,
+  and product entrypoint paths
+- `assets/branding/icon.svg` and `icon-dev.svg`, followed by `npm run render:icons`
+- README title, badges, clone commands, features, screenshots, development examples,
+  repository links, and product-specific usage
+
+Add a short README provenance statement linking to
+`https://github.com/50ra4/crx-vite-ts-react-template`. Preserve applicable license
+notices; provenance does not justify leaving template behavior or stale product names.
+
+Run `npm run verify` after identity and manifest edits. Treat any
+`verify:manifest` warning as incomplete adaptation even when the command exits zero.
+
+## 4. Rewrite the manifest expectation
+
+Edit `scripts/expected-manifest.config.mjs` as the product's exact built-manifest
+contract. Do not weaken `scripts/verify-manifest-engine.mjs` to accommodate a product.
+
+- Make `permissions`, `host_permissions`, `optional_permissions`, and
+  `optional_host_permissions` exact sets matching the source manifest.
+- Set all three surface expectations explicitly. For action, set both `present` and
+  `default_popup`.
+- For every retained content script, copy its production `matches` and effective
+  `run_at` into expected `content_scripts`.
+- CRXJS emits content chunks through `web_accessible_resources`. Keep one matching
+  expectation per emitted entry, with the same matches and only the required resource
+  names/patterns. When no content script remains, use `content_scripts: []` and
+  `web_accessible_resources: []`.
+- Keep the fixed CSP and `externally_connectable` prohibition. Product adaptation is
+  not permission to relax those invariants.
+
+Inspect `extension/manifest.json` after `npm run build`, then run
+`npm run verify:manifest`. The built file is authoritative for generated entries; the
+expectation file is authoritative for what the product intentionally allows.
+
+## 5. Replace E2E coverage
+
+Keep `e2e/fixtures.ts`, `e2e/manifest.ts`, and `e2e/manifest.test.ts`; they are
+surface-independent infrastructure. Replace `e2e/extension.spec.ts` with smoke tests
+against the actual selected build:
+
+- content only: visit an intercepted production URL, assert product injection, and
+  assert that no extension service worker exists
+- content + background: assert product injection and the extension service worker
+- popup + options: load both extension pages, assert product behavior, and assert no
+  extension service worker
+
+Remove manifest patches that merely simulate configurations the product no longer
+ships. A product test should fail when its real `manifest.config.ts` is wrong.
+
+Run `npm run verify:full`. Install Chromium with
+`npx playwright install chromium` only when the local Playwright browser is missing.
+
+## 6. Audit inherited documentation
+
+Classify every inherited document as **keep**, **rewrite for the product**, or
+**delete**. Do not leave a template claim because it is harmless-looking.
+
+- `AGENTS.md`: product name, retained surfaces, commands, architecture invariants,
+  recipes, verification table, and on-demand skill references
+- `README.md` and `docs/README.ja.md`: identity, capabilities, screenshots, quick
+  start, development paths, permissions, and release instructions
+- `docs/adr/`: retain decisions the product still adopts, rewrite product-specific
+  context and links, and supersede or remove decisions the product rejects
+- `SECURITY.md`: supported versions, reporting channel, repository links, maintainer,
+  and response expectations
+- `docs/releasing.md`, `docs/releasing.ja.md`, and
+  `.claude/skills/release/SKILL.md`: actual release and distribution policy
+- `.claude/skills/add-entrypoint/SKILL.md` and the AGENTS.md on-demand table: remove or
+  update references to deleted wiring and skills
+- `docs/store/privacy-policy.md`, `store-listing.md`, and `manual-test.md`: replace
+  every placeholder and HTML comment before a Store release; reconcile permissions
+  with the built manifest and stored data with the implementation
+- `.github/` workflows and templates: update product names and assumptions when the
+  release or contribution workflow differs
+
+Search the tracked tree for the old package/display name, repository URL,
+`exampleSetting`, `greet`, `content_script sample`, `https://example.com`, placeholder
+markers, and paths to deleted files. Review every match; keep only intentional
+provenance or reusable-template references.
+
+## 7. Completion gate
+
+Adaptation is complete only when all of these are true:
+
+1. `git status --short` contains only intentional product changes.
+2. `npm run verify` passes after pruning and again after identity/manifest updates.
+3. `npm run verify:full` passes against the final selected surfaces.
+4. The built manifest contains only intended surfaces, permissions, URL matches, and
+   generated resources.
+5. No sample behavior, stale path, placeholder, or unsupported documentation claim
+   remains.
+6. The final report lists retained surfaces, deleted layers, effective permissions,
+   persistence, verification commands, and any deliberately deferred Store work.
