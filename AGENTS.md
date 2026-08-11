@@ -134,7 +134,7 @@ Read these only when the row matches your task — they are excluded from the al
 | touching `manifest.config.ts`, background, or content scripts | `.claude/rules/chrome-extension.md` |
 | writing tests | `.claude/rules/testing.md` |
 | adding an extension surface (popup/options/background/content script) | `.claude/skills/add-entrypoint/SKILL.md` |
-| turning this template into a real extension project | `.claude/skills/adapt-template/SKILL.md` |
+| pruning surfaces, setting product identity, or auditing inherited docs while turning this template into a real extension | `.claude/skills/adapt-template/SKILL.md` |
 | releasing/packaging/deploying | `.claude/skills/release/SKILL.md` |
 
 ## Git
