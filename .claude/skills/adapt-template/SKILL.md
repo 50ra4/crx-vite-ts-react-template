@@ -176,6 +176,8 @@ with `npx playwright install chromium`.
 Classify every inherited document as **keep**, **rewrite for the product**, or
 **delete**. Do not leave a template claim because it is harmless-looking.
 
+### Update the agent contract
+
 - `AGENTS.md` has two machine-delimited contracts. The universal section from
   `<!-- AGENTS:UNIVERSAL:BEGIN -->` through `<!-- AGENTS:UNIVERSAL:END -->` must be
   preserved; do not rewrite it merely because product configuration changed. The
@@ -184,8 +186,27 @@ Classify every inherited document as **keep**, **rewrite for the product**, or
   pruned to match the product while retaining both boundary markers. Audit its
   product name, surfaces, commands, shared layers, recipes, verification table, and
   on-demand skill references.
-- `CLAUDE.md` and `.claude/rules/*.md`: product instructions, examples, and paths to
-  deleted entrypoints or sample files
+- Within the derivation-required section, describe only the surfaces and shared
+  layers retained by the product. Remove recipes and forbidden-change notes for
+  deleted infrastructure. Keep each command and verification mapping only when it
+  exists in `package.json` and still proves the stated change type.
+- Check every path named in the derivation-required section. A path to a deleted
+  entrypoint, shared layer, test helper, rule, or skill is a failed adaptation even
+  when all code checks pass.
+- Rebuild the on-demand context table from the files that remain. Every row must
+  point to an existing, applicable rule or skill. Review every retained file under
+  `.claude/skills/`; update or delete a skill that is no longer reachable from the
+  table or automatic discovery and no longer describes supported product work.
+- Keep `CLAUDE.md` as the single `@AGENTS.md` import. It may explain discovery, but
+  must not copy product facts that belong in the derivation-required section.
+- Run `npm test -- --run scripts/agent-doc-contract.test.mjs` after editing these
+  files. It proves that both marker pairs remain unique, ordered, non-empty, and
+  synchronized with `CLAUDE.md` and this skill.
+
+### Audit the remaining inherited documents
+
+- `.claude/rules/*.md`: update examples and paths to deleted entrypoints or sample
+  files
 - `README.md` and `docs/README.ja.md`: identity, capabilities, screenshots, quick
   start, development paths, permissions, and release instructions
 - `docs/adr/`: retain decisions the product still adopts, rewrite product-specific
@@ -194,8 +215,6 @@ Classify every inherited document as **keep**, **rewrite for the product**, or
   and response expectations
 - `docs/releasing.md`, `docs/releasing.ja.md`, and
   `.claude/skills/release/SKILL.md`: actual release and distribution policy
-- `.claude/skills/add-entrypoint/SKILL.md` and the AGENTS.md on-demand table: remove or
-  update references to deleted wiring and skills
 - `docs/store/privacy-policy.md`, `store-listing.md`, and `manual-test.md`: replace
   every placeholder and HTML comment before a Store release; reconcile permissions
   with the built manifest and stored data with the implementation
@@ -219,7 +238,10 @@ Adaptation is complete only when all of these are true:
 3. `npm run verify:full` passes against the final selected surfaces.
 4. The built manifest contains only intended surfaces, permissions, URL matches, and
    generated resources.
-5. No sample behavior, stale path, placeholder, or unsupported documentation claim
-   remains.
-6. The final report lists retained surfaces, deleted layers, effective permissions,
+5. `npm test -- --run scripts/agent-doc-contract.test.mjs` passes; the universal
+   section is unchanged by product-configuration edits, and the derivation-required
+   section matches the final tree.
+6. No sample behavior, stale path, orphaned skill reference, placeholder, or
+   unsupported documentation claim remains.
+7. The final report lists retained surfaces, deleted layers, effective permissions,
    persistence, verification commands, and any deliberately deferred Store work.
