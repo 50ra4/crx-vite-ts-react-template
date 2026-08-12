@@ -23,9 +23,8 @@ verification) are the source of truth; prose only explains which gate to run.
 ## Architecture invariants
 
 - **Dependency direction is `entrypoints → lib` only; `lib` never imports from
-  `entrypoints`.** Shared code stays reusable and unit-testable in isolation (with
-  `installChromeFake` from `src/lib/testing/chromeFake.ts`); a back-edge couples it
-  to one runtime surface.
+  `entrypoints`.** Shared code stays reusable and unit-testable in isolation; a
+  back-edge couples it to one runtime surface.
 - **Entrypoints do not import each other directly.** Extension surfaces are separate
   runtime contexts and communicate through an explicit messaging boundary rather
   than shared module state.
@@ -38,18 +37,14 @@ verification) are the source of truth; prose only explains which gate to run.
 
 ## Conventions
 
-- Named exports only, no default exports — except `*.config.ts` (`vite.config.ts`,
-  `manifest.config.ts`, `playwright.config.ts`, `vitest.config.ts`), which keep
-  `export default` because their tools require it.
+- Named exports only, no default exports — except configuration files whose tools
+  require a default export.
 - Components are arrow functions.
-- Unit tests are colocated as `*.test.ts(x)` next to TypeScript source or
-  `*.test.mjs` next to Node scripts; E2E helper unit tests live under `e2e/` as
-  `*.test.ts` with the Node environment pragma, while Playwright smoke tests use
-  `*.spec.ts`.
+- Unit tests are colocated with source; helper and browser tests use the
+  repository-defined locations and environments.
 - Hooks return tuples `as const` (state, action).
-- Formatting, quote style, and static checks are enforced by Oxlint, Prettier, and
-  tsc; run them instead of hand-checking. Import order is not lint-enforced; keep
-  imports reasonably grouped by convention.
+- Formatting, quote style, and static checks are enforced by the configured tools;
+  run them instead of hand-checking.
 
 ## Git
 
@@ -67,7 +62,7 @@ narration. Point out problems bluntly.
 - Destructive ops (rm -rf, force-push, history rewrite) need explicit user approval.
 - Never read, print, or commit secrets.
 - If the user corrects the same mistake twice, append the correction to the matching
-  `.claude/rules/*.md` file.
+  repository rule file.
 
 <!-- AGENTS:UNIVERSAL:END -->
 
@@ -124,6 +119,18 @@ under `src/entrypoints/<surface>/`. Root-level HTML files (popup/options) load
 | entrypoint wiring, messaging/storage round-trips, anything E2E exercises     | `npm run verify:full`                   |
 
 CI already runs the same underlying checks as separate jobs.
+
+## Repository conventions
+
+- The default-export exceptions are `vite.config.ts`, `manifest.config.ts`,
+  `playwright.config.ts`, and `vitest.config.ts` because their tools require them.
+- Unit tests are colocated as `*.test.ts(x)` next to TypeScript source or
+  `*.test.mjs` next to Node scripts. E2E helper unit tests live under `e2e/` as
+  `*.test.ts` with the Node environment pragma; Playwright smoke tests use
+  `*.spec.ts`.
+- Oxlint, Prettier, and tsc enforce the repository style. Import order is not
+  lint-enforced; keep imports reasonably grouped.
+- Repeated user corrections are recorded in the matching `.claude/rules/*.md` file.
 
 ## Product architecture
 

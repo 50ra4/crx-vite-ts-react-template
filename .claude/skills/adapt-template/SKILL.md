@@ -184,8 +184,8 @@ Classify every inherited document as **keep**, **rewrite for the product**, or
   derivation-required section from `<!-- AGENTS:DERIVATION-REQUIRED:BEGIN -->`
   through `<!-- AGENTS:DERIVATION-REQUIRED:END -->` must be updated, rewritten, or
   pruned to match the product while retaining both boundary markers. Audit its
-  product name, surfaces, commands, shared layers, recipes, verification table, and
-  on-demand skill references.
+  product name, surfaces, commands, shared layers, repository conventions, recipes,
+  verification table, and on-demand skill references.
 - Within the derivation-required section, describe only the surfaces and shared
   layers retained by the product. Remove recipes and forbidden-change notes for
   deleted infrastructure. Keep each command and verification mapping only when it
