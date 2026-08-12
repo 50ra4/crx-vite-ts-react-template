@@ -176,8 +176,14 @@ with `npx playwright install chromium`.
 Classify every inherited document as **keep**, **rewrite for the product**, or
 **delete**. Do not leave a template claim because it is harmless-looking.
 
-- `AGENTS.md`: product name, retained surfaces, commands, architecture invariants,
-  recipes, verification table, and on-demand skill references
+- `AGENTS.md` has two machine-delimited contracts. The universal section from
+  `<!-- AGENTS:UNIVERSAL:BEGIN -->` through `<!-- AGENTS:UNIVERSAL:END -->` must be
+  preserved; do not rewrite it merely because product configuration changed. The
+  derivation-required section from `<!-- AGENTS:DERIVATION-REQUIRED:BEGIN -->`
+  through `<!-- AGENTS:DERIVATION-REQUIRED:END -->` must be updated, rewritten, or
+  pruned to match the product while retaining both boundary markers. Audit its
+  product name, surfaces, commands, shared layers, recipes, verification table, and
+  on-demand skill references.
 - `CLAUDE.md` and `.claude/rules/*.md`: product instructions, examples, and paths to
   deleted entrypoints or sample files
 - `README.md` and `docs/README.ja.md`: identity, capabilities, screenshots, quick
