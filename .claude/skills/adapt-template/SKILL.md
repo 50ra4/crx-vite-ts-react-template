@@ -32,7 +32,7 @@ E2E suite and later by `npm run render:icons`. Then run `npm run verify:full`. A
 failing baseline must be understood first; otherwise pruning can hide an existing
 defect.
 
-## 2. Select and prune surfaces
+## 2. Select, prune, and re-contract surfaces
 
 Delete a surface as one unit. Its source, HTML wiring, manifest declaration,
 manifest expectation, E2E coverage, development links, screenshots, and prose must
@@ -163,8 +163,7 @@ against the actual selected build:
   assert that no extension service worker exists
 - content + background: assert product injection and the extension service worker
 - popup + options: load both extension pages, exercise their retained product
-  behavior, assert its result, assert no extension service worker, and confirm the
-  removed sample greeting UI/behavior is absent
+  behavior, assert its result, and assert no extension service worker
 
 Remove manifest patches that merely simulate configurations the product no longer
 ships. A product test should fail when its real `manifest.config.ts` is wrong.
@@ -201,7 +200,9 @@ Search the tracked tree for the old package/display name, repository URL,
 `exampleSetting`, `greet`, `content_script sample`, `src/examples`,
 `src/entrypoints/content/sample`, `https://example.com`, placeholder markers, and
 paths to deleted files. Review every match; keep only intentional provenance or
-reusable-template references.
+reusable-template references. This is a one-time adaptation gate: do not preserve
+template terms in product E2E assertions merely to prove that their old behavior is
+absent.
 
 ## 6. Completion gate
 
