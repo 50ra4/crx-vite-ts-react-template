@@ -1,23 +1,25 @@
 // @vitest-environment node
 
-import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   DERIVATION_BEGIN,
   DERIVATION_END,
+  collectRepositoryEntries,
   validateAgentDocContract,
 } from './agent-doc-contract.mjs';
 
 const readRepositoryFile = (path) => readFileSync(path, 'utf8');
 
-const repositoryEntries = execFileSync(
-  'git',
-  ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
-  { encoding: 'utf8' },
-)
-  .split('\0')
-  .filter((path) => path && existsSync(path));
+const repositoryEntries = collectRepositoryEntries(process.cwd());
 
 const validInput = {
   agents: readRepositoryFile('AGENTS.md'),
@@ -44,8 +46,23 @@ test('rejects changes to the canonical universal section', () => {
     '\n\nx\n\n',
   );
 
+  expect(validateAgentDocContract({ ...validInput, agents })).toEqual(
+    expect.arrayContaining([
+      expect.stringMatching(
+        /^Universal section content differs from the canonical contract: expected SHA-256 [a-f0-9]{64}; received [a-f0-9]{64}\./u,
+      ),
+    ]),
+  );
+});
+
+test('requires the derivation section to reference adapt-template', () => {
+  const agents = validInput.agents.replaceAll(
+    '.claude/skills/adapt-template/SKILL.md',
+    '.claude/skills/release/SKILL.md',
+  );
+
   expect(validateAgentDocContract({ ...validInput, agents })).toContain(
-    'Universal section content differs from the canonical contract.',
+    'Derivation-required section must reference .claude/skills/adapt-template/SKILL.md.',
   );
 });
 
@@ -82,6 +99,16 @@ test('rejects an npm command that package.json does not provide', () => {
   );
 });
 
+test('does not interpret an npm command containing a path as a file path', () => {
+  const agents = validInput.agents.replace(
+    DERIVATION_END,
+    'Run `npm test -- --run scripts/agent-doc-contract.test.mjs`.\n\n' +
+      DERIVATION_END,
+  );
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toEqual([]);
+});
+
 test('rejects surface metadata that no longer matches the entrypoint tree', () => {
   const agents = validInput.agents.replace('"background", ', '');
 
@@ -90,21 +117,15 @@ test('rejects surface metadata that no longer matches the entrypoint tree', () =
   );
 });
 
-test('rejects stale surface prose after that surface is removed', () => {
-  const agents = validInput.agents
-    .replace('"background", ', '')
-    .replace('    "src/entrypoints/background/background.ts",\n', '');
-  const entriesWithoutBackground = validInput.repositoryEntries.filter(
-    (path) => !path.startsWith('src/entrypoints/background/'),
+test('rejects metadata keys that duplicate prose validation', () => {
+  const agents = validInput.agents.replace(
+    '"sharedLayers": ["messaging", "storage", "testing"]',
+    '"sharedLayers": ["messaging", "storage", "testing"], "paths": ["AGENTS.md"]',
   );
 
-  expect(
-    validateAgentDocContract({
-      ...validInput,
-      agents,
-      repositoryEntries: entriesWithoutBackground,
-    }),
-  ).toContain('Derivation-required prose mentions removed surface: background');
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Derivation metadata must contain only surfaces and sharedLayers.',
+  );
 });
 
 test('rejects an instruction path after its target is deleted', () => {
@@ -115,6 +136,57 @@ test('rejects an instruction path after its target is deleted', () => {
   expect(
     validateAgentDocContract({ ...validInput, repositoryEntries }),
   ).toContain('Referenced path does not exist: .claude/rules/testing.md');
+});
+
+test('allows ordinary prose that uses removed surface or layer words', () => {
+  const universalBlock = validInput.agents.slice(
+    validInput.agents.indexOf('<!-- AGENTS:UNIVERSAL:BEGIN -->'),
+    validInput.agents.indexOf('<!-- AGENTS:UNIVERSAL:END -->') +
+      '<!-- AGENTS:UNIVERSAL:END -->'.length,
+  );
+  const derivation = `<!-- AGENTS:DERIVATION-REQUIRED:BEGIN -->
+
+<!-- AGENTS:DERIVATION-METADATA:BEGIN -->
+
+\`\`\`json
+{"surfaces":["content"],"sharedLayers":[]}
+\`\`\`
+
+<!-- AGENTS:DERIVATION-METADATA:END -->
+
+Follow \`.claude/skills/adapt-template/SKILL.md\`.
+CLI options are defined in \`vite.config.ts\`.
+The extension keeps no persistent storage. Unit testing stays in the fast lane.
+
+<!-- AGENTS:DERIVATION-REQUIRED:END -->`;
+
+  expect(
+    validateAgentDocContract({
+      ...validInput,
+      agents: `${universalBlock}\n\n${derivation}\n`,
+      repositoryEntries: [
+        '.claude/skills/adapt-template/SKILL.md',
+        'src/entrypoints/content/product.ts',
+        'vite.config.ts',
+      ],
+    }),
+  ).toEqual([]);
+});
+
+test('collects repository entries without requiring a git repository', () => {
+  const root = mkdtempSync(join(tmpdir(), 'agent-doc-contract-'));
+  try {
+    mkdirSync(join(root, 'src', 'entrypoints', 'content'), { recursive: true });
+    writeFileSync(join(root, 'AGENTS.md'), 'contract');
+    writeFileSync(join(root, 'src', 'entrypoints', 'content', 'index.ts'), '');
+
+    expect(collectRepositoryEntries(root)).toEqual([
+      'AGENTS.md',
+      'src/entrypoints/content/index.ts',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('rejects empty or malformed boundary sections', () => {

@@ -191,16 +191,20 @@ Classify every inherited document as **keep**, **rewrite for the product**, or
   product name, surfaces, commands, shared layers, repository conventions, recipes,
   verification table, and on-demand skill references.
 - A deliberate repository-independent change to the universal contract also requires
-  updating its canonical SHA-256 in `scripts/agent-doc-contract.mjs`; product
-  configuration alone is not a reason to change either value.
+  updating its canonical SHA-256 in `scripts/agent-doc-contract.mjs`. The validator
+  reports the expected and actual hashes; the value is SHA-256 of the trimmed text
+  between the universal markers. Product configuration alone is not a reason to
+  change either value.
 - Within the derivation-required section, describe only the surfaces and shared
   layers retained by the product. Remove recipes and forbidden-change notes for
   deleted infrastructure. Keep each command and verification mapping only when it
   exists in `package.json` and still proves the stated change type.
 - Update the JSON between `<!-- AGENTS:DERIVATION-METADATA:BEGIN -->` and
   `<!-- AGENTS:DERIVATION-METADATA:END -->`. Its `surfaces` must equal the directory
-  names under `src/entrypoints/`; its `paths` must name retained tracked files or
-  directories; and its `commands` must name retained `package.json` scripts.
+  names under `src/entrypoints/`, and its `sharedLayers` must equal the directory
+  names under `src/lib/`. These are the only metadata keys; literal paths and npm
+  commands in the surrounding prose are checked directly against the repository
+  tree and `package.json`.
 - Check every path named in the derivation-required section. A path to a deleted
   entrypoint, shared layer, test helper, rule, or skill is a failed adaptation even
   when all code checks pass.
@@ -212,7 +216,7 @@ Classify every inherited document as **keep**, **rewrite for the product**, or
   must not copy product facts that belong in the derivation-required section.
 - Run `npm test -- --run scripts/agent-doc-contract.test.mjs` after editing these
   files. It verifies the canonical universal content, marker structure, derivation
-  metadata, literal tracked paths, npm scripts, the single `@AGENTS.md` import, and
+  metadata, literal repository paths, npm scripts, the single `@AGENTS.md` import, and
   this skill's machine-readable contract anchors.
 
 ### Audit the remaining inherited documents
@@ -251,8 +255,8 @@ Adaptation is complete only when all of these are true:
 4. The built manifest contains only intended surfaces, permissions, URL matches, and
    generated resources.
 5. `npm test -- --run scripts/agent-doc-contract.test.mjs` passes; its canonical
-   universal-content check and derivation metadata/path/command checks match the
-   final tree.
+   universal-content check and derivation metadata plus literal path/command checks
+   match the final tree.
 6. No sample behavior, stale path, orphaned skill reference, placeholder, or
    unsupported documentation claim remains.
 7. The final report lists retained surfaces, deleted layers, effective permissions,

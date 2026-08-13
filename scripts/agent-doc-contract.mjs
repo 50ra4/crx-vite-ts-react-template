@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 export const UNIVERSAL_BEGIN = '<!-- AGENTS:UNIVERSAL:BEGIN -->';
 export const UNIVERSAL_END = '<!-- AGENTS:UNIVERSAL:END -->';
@@ -8,16 +10,42 @@ export const DERIVATION_END = '<!-- AGENTS:DERIVATION-REQUIRED:END -->';
 const METADATA_BEGIN = '<!-- AGENTS:DERIVATION-METADATA:BEGIN -->';
 const METADATA_END = '<!-- AGENTS:DERIVATION-METADATA:END -->';
 const UNIVERSAL_CONTRACT_SHA256 =
-  '25c89ee3593c6b6ce74d3ad51e23d22c479b9e84542af1e74a1b746296474d9f';
+  '7d635887805d369d092a4bebacc2b836cd42901b40108bc956eacb83d35c2ff7';
 const SKILL_UNIVERSAL_ANCHOR = '<!-- AGENTS-CONTRACT:UNIVERSAL:PRESERVE -->';
 const SKILL_DERIVATION_ANCHOR =
   '<!-- AGENTS-CONTRACT:DERIVATION:SYNCHRONIZE -->';
 const CLAUDE_SINGLE_SOURCE_ANCHOR = '<!-- AGENTS-CONTRACT:SINGLE-SOURCE -->';
-const KNOWN_SURFACES = ['background', 'content', 'options', 'popup'];
-const KNOWN_SHARED_LAYERS = ['messaging', 'storage', 'testing'];
 const ROOT_PATH_EXTENSION =
   /^(?:[^./][^/]*|\.[^./][^/]*)\.(?:html|json|md|mjs|svg|ts|tsx|yaml|yml)$/u;
 const ROOT_DOTFILES = new Set(['.nvmrc']);
+const IGNORED_DIRECTORIES = new Set([
+  '.git',
+  'coverage',
+  'extension',
+  'node_modules',
+  'playwright-report',
+  'test-results',
+]);
+
+export const collectRepositoryEntries = (root) => {
+  const entries = [];
+
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) continue;
+
+      const absolutePath = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolutePath);
+      } else if (entry.isFile()) {
+        entries.push(relative(root, absolutePath).replaceAll('\\', '/'));
+      }
+    }
+  };
+
+  visit(root);
+  return entries.toSorted();
+};
 
 const countOccurrences = (text, value) => text.split(value).length - 1;
 
@@ -61,6 +89,8 @@ const isLiteralTrackedPath = (value, repositoryEntries) => {
     value.includes('{') ||
     value.includes('}') ||
     value.startsWith('@') ||
+    value.startsWith('npm ') ||
+    value.startsWith('npx ') ||
     value.includes('://') ||
     value.startsWith('extension/') ||
     value === 'extension.zip'
@@ -189,7 +219,7 @@ export const validateAgentDocContract = ({
     const hash = createHash('sha256').update(universal).digest('hex');
     if (hash !== UNIVERSAL_CONTRACT_SHA256) {
       errors.push(
-        'Universal section content differs from the canonical contract.',
+        `Universal section content differs from the canonical contract: expected SHA-256 ${UNIVERSAL_CONTRACT_SHA256}; received ${hash}. Hash the trimmed text between the universal markers after an intentional contract update.`,
       );
     }
   }
@@ -224,37 +254,18 @@ export const validateAgentDocContract = ({
         );
       }
 
-      for (const path of validateStringArray(metadata, 'paths', errors)) {
-        if (!pathExists(path, repositoryEntries)) {
-          errors.push(`Metadata path does not exist: ${path}`);
-        }
+      const metadataKeys = Object.keys(metadata).toSorted();
+      if (formatList(metadataKeys) !== 'sharedLayers, surfaces') {
+        errors.push(
+          'Derivation metadata must contain only surfaces and sharedLayers.',
+        );
       }
+    }
 
-      for (const command of validateStringArray(metadata, 'commands', errors)) {
-        if (!Object.hasOwn(packageJson.scripts ?? {}, command)) {
-          errors.push(`Metadata npm script does not exist: ${command}`);
-        }
-      }
-
-      for (const surface of KNOWN_SURFACES.filter(
-        (surface) => !surfaces.includes(surface),
-      )) {
-        if (new RegExp(`\\b${surface}\\b`, 'iu').test(derivation)) {
-          errors.push(
-            `Derivation-required prose mentions removed surface: ${surface}`,
-          );
-        }
-      }
-
-      for (const layer of KNOWN_SHARED_LAYERS.filter(
-        (layer) => !sharedLayers.includes(layer),
-      )) {
-        if (new RegExp(`\\b${layer}\\b`, 'iu').test(derivation)) {
-          errors.push(
-            `Derivation-required prose mentions removed shared layer: ${layer}`,
-          );
-        }
-      }
+    if (!derivation.includes('.claude/skills/adapt-template/SKILL.md')) {
+      errors.push(
+        'Derivation-required section must reference .claude/skills/adapt-template/SKILL.md.',
+      );
     }
 
     const codeSpans = extractCodeSpans(derivation);

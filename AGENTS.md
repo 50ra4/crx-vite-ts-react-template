@@ -36,10 +36,8 @@ verification) are the source of truth; prose only explains which gate to run.
 
 - Named exports only, no default exports — except configuration files whose tools
   require a default export.
-- Components are arrow functions.
 - Unit tests are colocated with source; helper and browser tests use the
   repository-defined locations and environments.
-- Hooks return tuples `as const` (state, action).
 - Formatting, quote style, and static checks are enforced by the configured tools;
   run them instead of hand-checking.
 
@@ -77,39 +75,7 @@ narration. Point out problems bluntly.
 ```json
 {
   "surfaces": ["background", "content", "options", "popup"],
-  "sharedLayers": ["messaging", "storage", "testing"],
-  "paths": [
-    "AGENTS.md",
-    "CLAUDE.md",
-    ".claude/skills/adapt-template/SKILL.md",
-    "manifest.config.ts",
-    "options.html",
-    "popup.html",
-    "scripts/agent-doc-contract.mjs",
-    "scripts/agent-doc-contract.test.mjs",
-    "scripts/expected-manifest.config.mjs",
-    "src/entrypoints/background/background.ts",
-    "src/entrypoints/content/sample.tsx",
-    "src/entrypoints/options/options.tsx",
-    "src/entrypoints/popup/popup.tsx",
-    "src/lib/messaging/messages.ts",
-    "src/lib/storage/schema.ts"
-  ],
-  "commands": [
-    "build",
-    "check-type",
-    "dev",
-    "e2e",
-    "format",
-    "lint",
-    "package",
-    "render:icons",
-    "test",
-    "verify",
-    "verify:full",
-    "verify:manifest",
-    "zip"
-  ]
+  "sharedLayers": ["messaging", "storage", "testing"]
 }
 ```
 
@@ -161,6 +127,8 @@ CI already runs the same underlying checks as separate jobs.
 
 ## Repository conventions
 
+- Components are arrow functions.
+- Hooks return tuples `as const` (state, action).
 - The default-export exceptions are `vite.config.ts`, `manifest.config.ts`,
   `playwright.config.ts`, and `vitest.config.ts` because their tools require them.
 - Unit tests are colocated as `*.test.ts(x)` next to TypeScript source or
