@@ -1,73 +1,178 @@
 // @vitest-environment node
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 
-const UNIVERSAL_BEGIN = '<!-- AGENTS:UNIVERSAL:BEGIN -->';
-const UNIVERSAL_END = '<!-- AGENTS:UNIVERSAL:END -->';
-const DERIVATION_BEGIN = '<!-- AGENTS:DERIVATION-REQUIRED:BEGIN -->';
-const DERIVATION_END = '<!-- AGENTS:DERIVATION-REQUIRED:END -->';
+import {
+  DERIVATION_BEGIN,
+  DERIVATION_END,
+  validateAgentDocContract,
+} from './agent-doc-contract.mjs';
 
-const readRepositoryFile = (path) =>
-  readFileSync(resolve(process.cwd(), path), 'utf8');
+const readRepositoryFile = (path) => readFileSync(path, 'utf8');
 
-const countOccurrences = (text, value) => text.split(value).length - 1;
+const repositoryEntries = execFileSync(
+  'git',
+  ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+  { encoding: 'utf8' },
+)
+  .split('\0')
+  .filter((path) => path && existsSync(path));
 
-const extractSection = (text, begin, end) => {
-  const beginIndex = text.indexOf(begin);
-  const endIndex = text.indexOf(end);
-
-  return text.slice(beginIndex + begin.length, endIndex).trim();
+const validInput = {
+  agents: readRepositoryFile('AGENTS.md'),
+  claude: readRepositoryFile('CLAUDE.md'),
+  packageJson: JSON.parse(readRepositoryFile('package.json')),
+  repositoryEntries,
+  skill: readRepositoryFile('.claude/skills/adapt-template/SKILL.md'),
 };
 
-test('AGENTS.md has one ordered, non-empty pair of each contract boundary', () => {
-  const agents = readRepositoryFile('AGENTS.md');
-  const markers = [
-    UNIVERSAL_BEGIN,
-    UNIVERSAL_END,
+const replaceSection = (text, begin, end, replacement) => {
+  const before = text.slice(0, text.indexOf(begin) + begin.length);
+  const after = text.slice(text.indexOf(end));
+
+  return `${before}\n\n${replacement}\n\n${after}`;
+};
+
+test('accepts the repository agent-document contract', () => {
+  expect(validateAgentDocContract(validInput)).toEqual([]);
+});
+
+test('rejects changes to the canonical universal section', () => {
+  const agents = validInput.agents.replace(
+    /(?<=<!-- AGENTS:UNIVERSAL:BEGIN -->)[\s\S]*?(?=<!-- AGENTS:UNIVERSAL:END -->)/u,
+    '\n\nx\n\n',
+  );
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Universal section content differs from the canonical contract.',
+  );
+});
+
+test('rejects a stale path in the derivation-required section', () => {
+  const agents = validInput.agents.replace(
+    DERIVATION_END,
+    'See `.claude/rules/deleted.md`.\n\n' + DERIVATION_END,
+  );
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Referenced path does not exist: .claude/rules/deleted.md',
+  );
+});
+
+test('rejects a stale root-document path', () => {
+  const agents = validInput.agents.replace(
+    DERIVATION_END,
+    'See `deleted.md`.\n\n' + DERIVATION_END,
+  );
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Referenced path does not exist: deleted.md',
+  );
+});
+
+test('rejects an npm command that package.json does not provide', () => {
+  const agents = validInput.agents.replace(
+    DERIVATION_END,
+    'Run `npm run deleted-script`.\n\n' + DERIVATION_END,
+  );
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Referenced npm script does not exist: deleted-script',
+  );
+});
+
+test('rejects surface metadata that no longer matches the entrypoint tree', () => {
+  const agents = validInput.agents.replace('"background", ', '');
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Surface metadata must match src/entrypoints/: expected background, content, options, popup; received content, options, popup.',
+  );
+});
+
+test('rejects stale surface prose after that surface is removed', () => {
+  const agents = validInput.agents
+    .replace('"background", ', '')
+    .replace('    "src/entrypoints/background/background.ts",\n', '');
+  const entriesWithoutBackground = validInput.repositoryEntries.filter(
+    (path) => !path.startsWith('src/entrypoints/background/'),
+  );
+
+  expect(
+    validateAgentDocContract({
+      ...validInput,
+      agents,
+      repositoryEntries: entriesWithoutBackground,
+    }),
+  ).toContain('Derivation-required prose mentions removed surface: background');
+});
+
+test('rejects an instruction path after its target is deleted', () => {
+  const repositoryEntries = validInput.repositoryEntries.filter(
+    (path) => path !== '.claude/rules/testing.md',
+  );
+
+  expect(
+    validateAgentDocContract({ ...validInput, repositoryEntries }),
+  ).toContain('Referenced path does not exist: .claude/rules/testing.md');
+});
+
+test('rejects empty or malformed boundary sections', () => {
+  const agents = replaceSection(
+    validInput.agents,
     DERIVATION_BEGIN,
     DERIVATION_END,
-  ];
-
-  expect(markers.map((marker) => countOccurrences(agents, marker))).toEqual([
-    1, 1, 1, 1,
-  ]);
-  expect(markers.map((marker) => agents.indexOf(marker))).toEqual(
-    markers.map((marker) => agents.indexOf(marker)).toSorted((a, b) => a - b),
-  );
-  expect(extractSection(agents, UNIVERSAL_BEGIN, UNIVERSAL_END)).not.toBe('');
-  expect(extractSection(agents, DERIVATION_BEGIN, DERIVATION_END)).not.toBe('');
-});
-
-test('the derivation-required section points agents to adapt-template', () => {
-  const agents = readRepositoryFile('AGENTS.md');
-  const derivationSection = extractSection(
-    agents,
-    DERIVATION_BEGIN,
-    DERIVATION_END,
+    '',
   );
 
-  expect(derivationSection).toContain('.claude/skills/adapt-template/SKILL.md');
-});
-
-test('adapt-template preserves the universal boundary and updates the derivation boundary', () => {
-  const skill = readRepositoryFile('.claude/skills/adapt-template/SKILL.md');
-
-  expect(skill).toContain(UNIVERSAL_BEGIN);
-  expect(skill).toContain(UNIVERSAL_END);
-  expect(skill).toContain(DERIVATION_BEGIN);
-  expect(skill).toContain(DERIVATION_END);
-  expect(skill).toMatch(
-    /universal section[^.]+(?:preserve|do not (?:edit|rewrite))/i,
-  );
-  expect(skill).toMatch(
-    /derivation-required section[^.]+(?:update|rewrite|delete)/i,
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Derivation-required section must not be empty.',
   );
 });
 
-test('CLAUDE.md imports AGENTS.md exactly once', () => {
-  const claude = readRepositoryFile('CLAUDE.md');
-  const imports = claude.match(/^@AGENTS\.md\s*$/gmu) ?? [];
+test('rejects overlapping or reordered top-level sections', () => {
+  const universalBlock = validInput.agents.slice(
+    validInput.agents.indexOf('<!-- AGENTS:UNIVERSAL:BEGIN -->'),
+    validInput.agents.indexOf('<!-- AGENTS:UNIVERSAL:END -->') +
+      '<!-- AGENTS:UNIVERSAL:END -->'.length,
+  );
+  const derivationBlock = validInput.agents.slice(
+    validInput.agents.indexOf(DERIVATION_BEGIN),
+    validInput.agents.indexOf(DERIVATION_END) + DERIVATION_END.length,
+  );
 
-  expect(imports).toHaveLength(1);
+  expect(
+    validateAgentDocContract({
+      ...validInput,
+      agents: `${derivationBlock}\n\n${universalBlock}\n`,
+    }),
+  ).toContain(
+    'Universal and derivation-required sections must be ordered and non-overlapping.',
+  );
+});
+
+test('rejects shared-layer metadata that no longer matches src/lib', () => {
+  const agents = validInput.agents.replace('"messaging", ', '');
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Shared-layer metadata must match src/lib/: expected messaging, storage, testing; received storage, testing.',
+  );
+});
+
+test('requires machine-readable skill and CLAUDE contract anchors', () => {
+  const skill = validInput.skill.replace(
+    '<!-- AGENTS-CONTRACT:DERIVATION:SYNCHRONIZE -->',
+    '',
+  );
+  const claude = validInput.claude.replace(
+    '<!-- AGENTS-CONTRACT:SINGLE-SOURCE -->',
+    '',
+  );
+
+  expect(validateAgentDocContract({ ...validInput, skill })).toContain(
+    'adapt-template must declare the derivation synchronization contract.',
+  );
+  expect(validateAgentDocContract({ ...validInput, claude })).toContain(
+    'CLAUDE.md must declare AGENTS.md as its single source of truth.',
+  );
 });

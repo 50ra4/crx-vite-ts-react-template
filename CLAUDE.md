@@ -1,5 +1,7 @@
 # Claude Code Instructions
 
+<!-- AGENTS-CONTRACT:SINGLE-SOURCE -->
+
 @AGENTS.md
 
 `AGENTS.md` is the single source of truth. The import above loads both its universal
