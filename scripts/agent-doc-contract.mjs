@@ -19,13 +19,21 @@ const ROOT_PATH_EXTENSION =
   /^(?:[^./][^/]*|\.[^./][^/]*)\.(?:html|json|md|mjs|svg|ts|tsx|yaml|yml)$/u;
 const ROOT_DOTFILES = new Set(['.nvmrc']);
 const IGNORED_DIRECTORIES = new Set([
+  '.cache',
   '.git',
+  '.next',
+  '.nuxt',
+  '.serverless',
   'coverage',
+  'dist',
   'extension',
+  'logs',
   'node_modules',
   'playwright-report',
   'test-results',
 ]);
+const IGNORED_FILES = new Set(['.env', '.env.test', 'extension.zip']);
+const IGNORED_FILE_PATTERNS = [/\.log$/u, /\.pid$/u, /\.tgz$/u];
 
 export const collectRepositoryEntries = (root) => {
   const entries = [];
@@ -38,6 +46,12 @@ export const collectRepositoryEntries = (root) => {
       if (entry.isDirectory()) {
         visit(absolutePath);
       } else if (entry.isFile()) {
+        if (
+          IGNORED_FILES.has(entry.name) ||
+          IGNORED_FILE_PATTERNS.some((pattern) => pattern.test(entry.name))
+        ) {
+          continue;
+        }
         entries.push(relative(root, absolutePath).replaceAll('\\', '/'));
       }
     }
@@ -81,16 +95,15 @@ const pathExists = (path, repositoryEntries) => {
 const extractCodeSpans = (text) =>
   [...text.matchAll(/`([^`\n]+)`/gu)].map((match) => match[1].trim());
 
-const isLiteralTrackedPath = (value, repositoryEntries) => {
+const isLiteralRepositoryPath = (value, repositoryEntries) => {
   if (
+    /\s/u.test(value) ||
     value.includes('*') ||
     value.includes('<') ||
     value.includes('>') ||
     value.includes('{') ||
     value.includes('}') ||
     value.startsWith('@') ||
-    value.startsWith('npm ') ||
-    value.startsWith('npx ') ||
     value.includes('://') ||
     value.startsWith('extension/') ||
     value === 'extension.zip'
@@ -155,6 +168,30 @@ const validateStringArray = (metadata, key, errors) => {
   }
 
   return [...new Set(value)].toSorted();
+};
+
+const validateRoot = (
+  metadata,
+  key,
+  label,
+  errors,
+  { nullable = false } = {},
+) => {
+  const value = metadata?.[key];
+
+  if (nullable && value === null) return null;
+  if (typeof value !== 'string' || value.length === 0) {
+    errors.push(
+      `Derivation metadata ${key} must be ${nullable ? 'a repository path or null' : 'a repository path'}.`,
+    );
+    return null;
+  }
+
+  if (value.endsWith('/')) {
+    errors.push(`Derivation metadata ${key} must not end with a slash.`);
+  }
+
+  return { label, path: value.replace(/\/$/u, '') };
 };
 
 const listDirectories = (repositoryEntries, root) =>
@@ -228,14 +265,33 @@ export const validateAgentDocContract = ({
     const metadata = parseMetadata(derivation, errors);
 
     if (metadata) {
-      const surfaces = validateStringArray(metadata, 'surfaces', errors);
-      const expectedSurfaces = listDirectories(
-        repositoryEntries,
-        'src/entrypoints',
+      const entrypointRoot = validateRoot(
+        metadata,
+        'entrypointRoot',
+        'Entrypoint',
+        errors,
       );
+      const sharedRoot = validateRoot(
+        metadata,
+        'sharedRoot',
+        'Shared',
+        errors,
+        { nullable: true },
+      );
+
+      for (const root of [entrypointRoot, sharedRoot].filter(Boolean)) {
+        if (!pathExists(root.path, repositoryEntries)) {
+          errors.push(`${root.label} root does not exist: ${root.path}`);
+        }
+      }
+
+      const surfaces = validateStringArray(metadata, 'surfaces', errors);
+      const expectedSurfaces = entrypointRoot
+        ? listDirectories(repositoryEntries, entrypointRoot.path)
+        : [];
       if (formatList(surfaces) !== formatList(expectedSurfaces)) {
         errors.push(
-          `Surface metadata must match src/entrypoints/: expected ${formatList(expectedSurfaces)}; received ${formatList(surfaces)}.`,
+          `Surface metadata must match ${entrypointRoot?.path ?? 'the configured entrypoint root'}/: expected ${formatList(expectedSurfaces)}; received ${formatList(surfaces)}.`,
         );
       }
 
@@ -244,25 +300,30 @@ export const validateAgentDocContract = ({
         'sharedLayers',
         errors,
       );
-      const expectedSharedLayers = listDirectories(
-        repositoryEntries,
-        'src/lib',
-      );
+      const expectedSharedLayers = sharedRoot
+        ? listDirectories(repositoryEntries, sharedRoot.path)
+        : [];
       if (formatList(sharedLayers) !== formatList(expectedSharedLayers)) {
         errors.push(
-          `Shared-layer metadata must match src/lib/: expected ${formatList(expectedSharedLayers)}; received ${formatList(sharedLayers)}.`,
+          `Shared-layer metadata must match ${sharedRoot?.path ?? 'the configured shared root'}/: expected ${formatList(expectedSharedLayers)}; received ${formatList(sharedLayers)}.`,
         );
       }
 
       const metadataKeys = Object.keys(metadata).toSorted();
-      if (formatList(metadataKeys) !== 'sharedLayers, surfaces') {
+      if (
+        formatList(metadataKeys) !==
+        'entrypointRoot, sharedLayers, sharedRoot, surfaces'
+      ) {
         errors.push(
-          'Derivation metadata must contain only surfaces and sharedLayers.',
+          'Derivation metadata must contain only entrypointRoot, sharedRoot, surfaces, and sharedLayers.',
         );
       }
     }
 
-    if (!derivation.includes('.claude/skills/adapt-template/SKILL.md')) {
+    if (
+      skill != null &&
+      !derivation.includes('.claude/skills/adapt-template/SKILL.md')
+    ) {
       errors.push(
         'Derivation-required section must reference .claude/skills/adapt-template/SKILL.md.',
       );
@@ -270,7 +331,7 @@ export const validateAgentDocContract = ({
 
     const codeSpans = extractCodeSpans(derivation);
     for (const path of codeSpans.filter((value) =>
-      isLiteralTrackedPath(value, repositoryEntries),
+      isLiteralRepositoryPath(value, repositoryEntries),
     )) {
       if (!pathExists(path, repositoryEntries)) {
         errors.push(`Referenced path does not exist: ${path}`);
@@ -283,15 +344,17 @@ export const validateAgentDocContract = ({
     }
   }
 
-  if (countOccurrences(skill, SKILL_UNIVERSAL_ANCHOR) !== 1) {
-    errors.push(
-      'adapt-template must declare the universal preservation contract.',
-    );
-  }
-  if (countOccurrences(skill, SKILL_DERIVATION_ANCHOR) !== 1) {
-    errors.push(
-      'adapt-template must declare the derivation synchronization contract.',
-    );
+  if (skill != null) {
+    if (countOccurrences(skill, SKILL_UNIVERSAL_ANCHOR) !== 1) {
+      errors.push(
+        'adapt-template must declare the universal preservation contract.',
+      );
+    }
+    if (countOccurrences(skill, SKILL_DERIVATION_ANCHOR) !== 1) {
+      errors.push(
+        'adapt-template must declare the derivation synchronization contract.',
+      );
+    }
   }
 
   const imports = claude.match(/^@AGENTS\.md\s*$/gmu) ?? [];

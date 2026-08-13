@@ -74,6 +74,8 @@ narration. Point out problems bluntly.
 
 ```json
 {
+  "entrypointRoot": "src/entrypoints",
+  "sharedRoot": "src/lib",
   "surfaces": ["background", "content", "options", "popup"],
   "sharedLayers": ["messaging", "storage", "testing"]
 }

@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -18,6 +19,8 @@ import {
 } from './agent-doc-contract.mjs';
 
 const readRepositoryFile = (path) => readFileSync(path, 'utf8');
+const readOptionalRepositoryFile = (path) =>
+  existsSync(path) ? readRepositoryFile(path) : null;
 
 const repositoryEntries = collectRepositoryEntries(process.cwd());
 
@@ -26,7 +29,7 @@ const validInput = {
   claude: readRepositoryFile('CLAUDE.md'),
   packageJson: JSON.parse(readRepositoryFile('package.json')),
   repositoryEntries,
-  skill: readRepositoryFile('.claude/skills/adapt-template/SKILL.md'),
+  skill: readOptionalRepositoryFile('.claude/skills/adapt-template/SKILL.md'),
 };
 
 const replaceSection = (text, begin, end, replacement) => {
@@ -64,6 +67,25 @@ test('requires the derivation section to reference adapt-template', () => {
   expect(validateAgentDocContract({ ...validInput, agents })).toContain(
     'Derivation-required section must reference .claude/skills/adapt-template/SKILL.md.',
   );
+});
+
+test('allows a derived product to remove adapt-template and its reference', () => {
+  const agents = validInput.agents.replaceAll(
+    '.claude/skills/adapt-template/SKILL.md',
+    '.claude/skills/release/SKILL.md',
+  );
+  const repositoryEntries = validInput.repositoryEntries.filter(
+    (path) => path !== '.claude/skills/adapt-template/SKILL.md',
+  );
+
+  expect(
+    validateAgentDocContract({
+      ...validInput,
+      agents,
+      repositoryEntries,
+      skill: null,
+    }),
+  ).toEqual([]);
 });
 
 test('rejects a stale path in the derivation-required section', () => {
@@ -109,6 +131,15 @@ test('does not interpret an npm command containing a path as a file path', () =>
   expect(validateAgentDocContract({ ...validInput, agents })).toEqual([]);
 });
 
+test('does not interpret other commands containing paths as file paths', () => {
+  const agents = validInput.agents.replace(
+    DERIVATION_END,
+    'Run `node scripts/verify-manifest.mjs`.\n\n' + DERIVATION_END,
+  );
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toEqual([]);
+});
+
 test('rejects surface metadata that no longer matches the entrypoint tree', () => {
   const agents = validInput.agents.replace('"background", ', '');
 
@@ -124,7 +155,7 @@ test('rejects metadata keys that duplicate prose validation', () => {
   );
 
   expect(validateAgentDocContract({ ...validInput, agents })).toContain(
-    'Derivation metadata must contain only surfaces and sharedLayers.',
+    'Derivation metadata must contain only entrypointRoot, sharedRoot, surfaces, and sharedLayers.',
   );
 });
 
@@ -149,7 +180,7 @@ test('allows ordinary prose that uses removed surface or layer words', () => {
 <!-- AGENTS:DERIVATION-METADATA:BEGIN -->
 
 \`\`\`json
-{"surfaces":["content"],"sharedLayers":[]}
+{"entrypointRoot":"src/entrypoints","sharedRoot":null,"surfaces":["content"],"sharedLayers":[]}
 \`\`\`
 
 <!-- AGENTS:DERIVATION-METADATA:END -->
@@ -173,6 +204,60 @@ The extension keeps no persistent storage. Unit testing stays in the fast lane.
   ).toEqual([]);
 });
 
+test('uses metadata roots when a derived product changes its source layout', () => {
+  const universalBlock = validInput.agents.slice(
+    validInput.agents.indexOf('<!-- AGENTS:UNIVERSAL:BEGIN -->'),
+    validInput.agents.indexOf('<!-- AGENTS:UNIVERSAL:END -->') +
+      '<!-- AGENTS:UNIVERSAL:END -->'.length,
+  );
+  const derivation = `<!-- AGENTS:DERIVATION-REQUIRED:BEGIN -->
+
+<!-- AGENTS:DERIVATION-METADATA:BEGIN -->
+
+\`\`\`json
+{
+  "entrypointRoot": "src/surfaces",
+  "sharedRoot": "src/shared",
+  "surfaces": ["content"],
+  "sharedLayers": ["core"]
+}
+\`\`\`
+
+<!-- AGENTS:DERIVATION-METADATA:END -->
+
+Follow \`.claude/skills/adapt-template/SKILL.md\`.
+
+<!-- AGENTS:DERIVATION-REQUIRED:END -->`;
+
+  expect(
+    validateAgentDocContract({
+      ...validInput,
+      agents: `${universalBlock}\n\n${derivation}\n`,
+      repositoryEntries: [
+        '.claude/skills/adapt-template/SKILL.md',
+        'src/shared/core/index.ts',
+        'src/surfaces/content/product.ts',
+      ],
+    }),
+  ).toEqual([]);
+});
+
+test('rejects metadata roots that do not exist', () => {
+  const agents = validInput.agents
+    .replace(
+      '"entrypointRoot": "src/entrypoints"',
+      '"entrypointRoot": "src/missing-entrypoints"',
+    )
+    .replace('"sharedRoot": "src/lib"', '"sharedRoot": "src/missing-shared"');
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toEqual(
+    expect.arrayContaining([
+      'Entrypoint root does not exist: src/missing-entrypoints',
+      'Shared root does not exist: src/missing-shared',
+    ]),
+  );
+});
+
 test('collects repository entries without requiring a git repository', () => {
   const root = mkdtempSync(join(tmpdir(), 'agent-doc-contract-'));
   try {
@@ -184,6 +269,19 @@ test('collects repository entries without requiring a git repository', () => {
       'AGENTS.md',
       'src/entrypoints/content/index.ts',
     ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('does not collect generated directories ignored by the repository', () => {
+  const root = mkdtempSync(join(tmpdir(), 'agent-doc-contract-'));
+  try {
+    mkdirSync(join(root, 'dist'), { recursive: true });
+    writeFileSync(join(root, 'AGENTS.md'), 'contract');
+    writeFileSync(join(root, 'dist', 'notes.md'), 'generated');
+
+    expect(collectRepositoryEntries(root)).toEqual(['AGENTS.md']);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

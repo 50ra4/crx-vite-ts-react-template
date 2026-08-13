@@ -200,18 +200,35 @@ Classify every inherited document as **keep**, **rewrite for the product**, or
   deleted infrastructure. Keep each command and verification mapping only when it
   exists in `package.json` and still proves the stated change type.
 - Update the JSON between `<!-- AGENTS:DERIVATION-METADATA:BEGIN -->` and
-  `<!-- AGENTS:DERIVATION-METADATA:END -->`. Its `surfaces` must equal the directory
-  names under `src/entrypoints/`, and its `sharedLayers` must equal the directory
-  names under `src/lib/`. These are the only metadata keys; literal paths and npm
-  commands in the surrounding prose are checked directly against the repository
-  tree and `package.json`.
+  `<!-- AGENTS:DERIVATION-METADATA:END -->`. Set `entrypointRoot` and `sharedRoot`
+  to the product's actual repository paths, then make `surfaces` and `sharedLayers`
+  equal their immediate child-directory names. Use `null` for `sharedRoot` only when
+  the product has no shared-module directory, and keep `sharedLayers` empty with it.
+  These are the only metadata keys. The validator rejects a configured root that
+  does not exist, so a layout rename cannot silently reduce the contract to empty
+  arrays.
 - Check every path named in the derivation-required section. A path to a deleted
   entrypoint, shared layer, test helper, rule, or skill is a failed adaptation even
   when all code checks pass.
+- Inline code spans without whitespace are treated as repository paths when they
+  look path-like. Spans containing whitespace are command candidates instead, which
+  avoids treating `node scripts/example.mjs` as one path; npm script names are also
+  checked against `package.json`.
+- Repository collection deliberately excludes generated and local-only paths such as
+  `dist`, `extension`, dependency/cache directories, `.env`, logs, and package
+  archives. When `.gitignore` gains another generated-output family that could mask
+  a stale documentation path, update the ignore sets in
+  `scripts/agent-doc-contract.mjs` and its test in the same change.
 - Rebuild the on-demand context table from the files that remain. Every row must
   point to an existing, applicable rule or skill. Review every retained file under
   `.claude/skills/`; update or delete a skill that is no longer reachable from the
   table or automatic discovery and no longer describes supported product work.
+- Keep `adapt-template` and its derivation-section reference while adaptation is in
+  progress. After the product contract is complete and verified, the final cleanup
+  may delete this skill and remove every reference to it. The contract test reads the
+  skill optionally: when it remains, its anchors and derivation reference are
+  required; when it is deleted, skill-specific checks are skipped while all AGENTS,
+  path, metadata, command, and CLAUDE checks continue to run.
 - Keep `CLAUDE.md` as the single `@AGENTS.md` import. It may explain discovery, but
   must not copy product facts that belong in the derivation-required section.
 - Run `npm test -- --run scripts/agent-doc-contract.test.mjs` after editing these
