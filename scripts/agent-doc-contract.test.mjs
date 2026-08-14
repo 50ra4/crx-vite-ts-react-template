@@ -258,6 +258,22 @@ test('rejects metadata roots that do not exist', () => {
   );
 });
 
+test('rejects a metadata root that points to a file', () => {
+  const agents = validInput.agents
+    .replace(
+      '"entrypointRoot": "src/entrypoints"',
+      '"entrypointRoot": "AGENTS.md"',
+    )
+    .replace(
+      '"surfaces": ["background", "content", "options", "popup"]',
+      '"surfaces": []',
+    );
+
+  expect(validateAgentDocContract({ ...validInput, agents })).toContain(
+    'Entrypoint root is not a repository directory: AGENTS.md',
+  );
+});
+
 test('collects repository entries without requiring a git repository', () => {
   const root = mkdtempSync(join(tmpdir(), 'agent-doc-contract-'));
   try {
@@ -282,6 +298,20 @@ test('does not collect generated directories ignored by the repository', () => {
     writeFileSync(join(root, 'dist', 'notes.md'), 'generated');
 
     expect(collectRepositoryEntries(root)).toEqual(['AGENTS.md']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('keeps source directories whose basename matches a root-level ignore', () => {
+  const root = mkdtempSync(join(tmpdir(), 'agent-doc-contract-'));
+  try {
+    mkdirSync(join(root, 'logs'), { recursive: true });
+    mkdirSync(join(root, 'src', 'lib', 'logs'), { recursive: true });
+    writeFileSync(join(root, 'logs', 'debug.log'), 'generated');
+    writeFileSync(join(root, 'src', 'lib', 'logs', 'logger.ts'), 'source');
+
+    expect(collectRepositoryEntries(root)).toEqual(['src/lib/logs/logger.ts']);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

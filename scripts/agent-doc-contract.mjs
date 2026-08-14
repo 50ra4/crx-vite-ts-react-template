@@ -18,7 +18,7 @@ const CLAUDE_SINGLE_SOURCE_ANCHOR = '<!-- AGENTS-CONTRACT:SINGLE-SOURCE -->';
 const ROOT_PATH_EXTENSION =
   /^(?:[^./][^/]*|\.[^./][^/]*)\.(?:html|json|md|mjs|svg|ts|tsx|yaml|yml)$/u;
 const ROOT_DOTFILES = new Set(['.nvmrc']);
-const IGNORED_DIRECTORIES = new Set([
+const ROOT_IGNORED_DIRECTORIES = new Set([
   '.cache',
   '.git',
   '.next',
@@ -32,23 +32,33 @@ const IGNORED_DIRECTORIES = new Set([
   'playwright-report',
   'test-results',
 ]);
-const IGNORED_FILES = new Set(['.env', '.env.test', 'extension.zip']);
-const IGNORED_FILE_PATTERNS = [/\.log$/u, /\.pid$/u, /\.tgz$/u];
+const ROOT_IGNORED_FILES = new Set(['.env', '.env.test', 'extension.zip']);
+const ROOT_IGNORED_FILE_PATTERNS = [/\.log$/u, /\.pid$/u, /\.tgz$/u];
 
 export const collectRepositoryEntries = (root) => {
   const entries = [];
 
   const visit = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) continue;
+      const isRootEntry = directory === root;
+      if (
+        isRootEntry &&
+        entry.isDirectory() &&
+        ROOT_IGNORED_DIRECTORIES.has(entry.name)
+      ) {
+        continue;
+      }
 
       const absolutePath = join(directory, entry.name);
       if (entry.isDirectory()) {
         visit(absolutePath);
       } else if (entry.isFile()) {
         if (
-          IGNORED_FILES.has(entry.name) ||
-          IGNORED_FILE_PATTERNS.some((pattern) => pattern.test(entry.name))
+          isRootEntry &&
+          (ROOT_IGNORED_FILES.has(entry.name) ||
+            ROOT_IGNORED_FILE_PATTERNS.some((pattern) =>
+              pattern.test(entry.name),
+            ))
         ) {
           continue;
         }
@@ -90,6 +100,12 @@ const pathExists = (path, repositoryEntries) => {
     repositoryEntries.includes(normalized) ||
     repositoryEntries.some((entry) => entry.startsWith(`${normalized}/`))
   );
+};
+
+const directoryExists = (path, repositoryEntries) => {
+  const normalized = path.replace(/\/$/u, '');
+
+  return repositoryEntries.some((entry) => entry.startsWith(`${normalized}/`));
 };
 
 const extractCodeSpans = (text) =>
@@ -282,6 +298,10 @@ export const validateAgentDocContract = ({
       for (const root of [entrypointRoot, sharedRoot].filter(Boolean)) {
         if (!pathExists(root.path, repositoryEntries)) {
           errors.push(`${root.label} root does not exist: ${root.path}`);
+        } else if (!directoryExists(root.path, repositoryEntries)) {
+          errors.push(
+            `${root.label} root is not a repository directory: ${root.path}`,
+          );
         }
       }
 
