@@ -51,28 +51,28 @@
   },
   "homepage": "https://github.com/50ra4/crx-vite-ts-react-template#readme",
   "dependencies": {
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "2.7.1",
-    "@playwright/test": "1.61.1",
+    "@playwright/test": "1.62.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
-    "@types/chrome": "0.2.2",
-    "@types/node": "26.1.1",
-    "@types/react": "19.2.17",
-    "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.3",
+    "@types/chrome": "0.2.5",
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.0.5",
     "fflate": "0.8.3",
     "husky": "9.1.7",
     "jsdom": "29.1.1",
-    "lint-staged": "17.0.8",
-    "oxlint": "1.74.0",
-    "prettier": "3.9.5",
+    "lint-staged": "17.3.0",
+    "oxlint": "1.78.0",
+    "prettier": "3.9.6",
     "typescript": "7.0.2",
-    "vite": "8.1.5",
+    "vite": "8.2.1",
     "vitest": "4.1.10"
   }
 }
