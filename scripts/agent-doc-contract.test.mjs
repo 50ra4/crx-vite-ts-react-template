@@ -317,6 +317,27 @@ test('keeps source directories whose basename matches a root-level ignore', () =
   }
 });
 
+test('ignores dependency and git directories at every depth', () => {
+  const root = mkdtempSync(join(tmpdir(), 'agent-doc-contract-'));
+  try {
+    mkdirSync(join(root, 'packages', 'app', 'node_modules', 'lodash'), {
+      recursive: true,
+    });
+    mkdirSync(join(root, 'vendor', '.git', 'objects'), { recursive: true });
+    mkdirSync(join(root, 'src', 'lib', 'logs'), { recursive: true });
+    writeFileSync(
+      join(root, 'packages', 'app', 'node_modules', 'lodash', 'index.js'),
+      'dependency',
+    );
+    writeFileSync(join(root, 'vendor', '.git', 'objects', 'blob'), 'metadata');
+    writeFileSync(join(root, 'src', 'lib', 'logs', 'logger.ts'), 'source');
+
+    expect(collectRepositoryEntries(root)).toEqual(['src/lib/logs/logger.ts']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('rejects empty or malformed boundary sections', () => {
   const agents = replaceSection(
     validInput.agents,

@@ -214,12 +214,12 @@ Classify every inherited document as **keep**, **rewrite for the product**, or
   look path-like. Spans containing whitespace are command candidates instead, which
   avoids treating `node scripts/example.mjs` as one path; npm script names are also
   checked against `package.json`.
-- Repository collection deliberately excludes root-level generated and local-only
-  paths such as `dist`, `extension`, dependency/cache directories, `.env`, logs, and
-  package archives. Limit these basename exclusions to the repository root so a real
-  source directory such as `src/lib/logs/` remains visible. When `.gitignore` gains
-  another root-level generated-output family that could mask a stale documentation
-  path, update the ignore sets in
+- Repository collection excludes `.git` and `node_modules` directories at every
+  depth. Other generated and local-only paths such as root-level `dist`, `extension`,
+  cache directories, `.env`, logs, and package archives are excluded only at the
+  repository root so a real source directory such as `src/lib/logs/` remains visible.
+  When `.gitignore` gains another root-level generated-output family that could mask
+  a stale documentation path, update the ignore sets in
   `scripts/agent-doc-contract.mjs` and its test in the same change.
 - Rebuild the on-demand context table from the files that remain. Every row must
   point to an existing, applicable rule or skill. Review every retained file under

@@ -18,9 +18,9 @@ const CLAUDE_SINGLE_SOURCE_ANCHOR = '<!-- AGENTS-CONTRACT:SINGLE-SOURCE -->';
 const ROOT_PATH_EXTENSION =
   /^(?:[^./][^/]*|\.[^./][^/]*)\.(?:html|json|md|mjs|svg|ts|tsx|yaml|yml)$/u;
 const ROOT_DOTFILES = new Set(['.nvmrc']);
+const ALWAYS_IGNORED_DIRECTORIES = new Set(['.git', 'node_modules']);
 const ROOT_IGNORED_DIRECTORIES = new Set([
   '.cache',
-  '.git',
   '.next',
   '.nuxt',
   '.serverless',
@@ -28,7 +28,6 @@ const ROOT_IGNORED_DIRECTORIES = new Set([
   'dist',
   'extension',
   'logs',
-  'node_modules',
   'playwright-report',
   'test-results',
 ]);
@@ -42,9 +41,9 @@ export const collectRepositoryEntries = (root) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const isRootEntry = directory === root;
       if (
-        isRootEntry &&
         entry.isDirectory() &&
-        ROOT_IGNORED_DIRECTORIES.has(entry.name)
+        (ALWAYS_IGNORED_DIRECTORIES.has(entry.name) ||
+          (isRootEntry && ROOT_IGNORED_DIRECTORIES.has(entry.name)))
       ) {
         continue;
       }
