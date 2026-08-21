@@ -176,10 +176,72 @@ with `npx playwright install chromium`.
 Classify every inherited document as **keep**, **rewrite for the product**, or
 **delete**. Do not leave a template claim because it is harmless-looking.
 
-- `AGENTS.md`: product name, retained surfaces, commands, architecture invariants,
-  recipes, verification table, and on-demand skill references
-- `CLAUDE.md` and `.claude/rules/*.md`: product instructions, examples, and paths to
-  deleted entrypoints or sample files
+### Update the agent contract
+
+<!-- AGENTS-CONTRACT:UNIVERSAL:PRESERVE -->
+
+<!-- AGENTS-CONTRACT:DERIVATION:SYNCHRONIZE -->
+
+- `AGENTS.md` has two machine-delimited contracts. The universal section from
+  `<!-- AGENTS:UNIVERSAL:BEGIN -->` through `<!-- AGENTS:UNIVERSAL:END -->` must be
+  preserved; do not rewrite it merely because product configuration changed. The
+  derivation-required section from `<!-- AGENTS:DERIVATION-REQUIRED:BEGIN -->`
+  through `<!-- AGENTS:DERIVATION-REQUIRED:END -->` must be updated, rewritten, or
+  pruned to match the product while retaining both boundary markers. Audit its
+  product name, surfaces, commands, shared layers, repository conventions, recipes,
+  verification table, and on-demand skill references.
+- A deliberate repository-independent change to the universal contract also requires
+  updating its canonical SHA-256 in `scripts/agent-doc-contract.mjs`. The validator
+  reports the expected and actual hashes; the value is SHA-256 of the trimmed text
+  between the universal markers. Product configuration alone is not a reason to
+  change either value.
+- Within the derivation-required section, describe only the surfaces and shared
+  layers retained by the product. Remove recipes and forbidden-change notes for
+  deleted infrastructure. Keep each command and verification mapping only when it
+  exists in `package.json` and still proves the stated change type.
+- Update the JSON between `<!-- AGENTS:DERIVATION-METADATA:BEGIN -->` and
+  `<!-- AGENTS:DERIVATION-METADATA:END -->`. Set `entrypointRoot` and `sharedRoot`
+  to the product's actual repository paths, then make `surfaces` and `sharedLayers`
+  equal their immediate child-directory names. Use `null` for `sharedRoot` only when
+  the product has no shared-module directory, and keep `sharedLayers` empty with it.
+  These are the only metadata keys. The validator rejects a configured root that
+  does not exist, so a layout rename cannot silently reduce the contract to empty
+  arrays.
+- Check every path named in the derivation-required section. A path to a deleted
+  entrypoint, shared layer, test helper, rule, or skill is a failed adaptation even
+  when all code checks pass.
+- Inline code spans without whitespace are treated as repository paths when they
+  look path-like. Spans containing whitespace are command candidates instead, which
+  avoids treating `node scripts/example.mjs` as one path; npm script names are also
+  checked against `package.json`.
+- Repository collection excludes `.git` and `node_modules` directories at every
+  depth. Other generated and local-only paths such as root-level `dist`, `extension`,
+  cache directories, `.env`, logs, and package archives are excluded only at the
+  repository root so a real source directory such as `src/lib/logs/` remains visible.
+  When `.gitignore` gains another root-level generated-output family that could mask
+  a stale documentation path, update the ignore sets in
+  `scripts/agent-doc-contract.mjs` and its test in the same change.
+- Rebuild the on-demand context table from the files that remain. Every row must
+  point to an existing, applicable rule or skill. Review every retained file under
+  `.claude/skills/`; update or delete a skill that is no longer reachable from the
+  table or automatic discovery and no longer describes supported product work.
+- Keep `adapt-template` and its derivation-section reference while adaptation is in
+  progress. After the product contract is complete and verified, the final cleanup
+  may delete this skill and remove every reference to it. The contract test reads the
+  skill optionally: when it remains, its anchors and derivation reference are
+  required; when it is deleted, skill-specific checks are skipped while all AGENTS,
+  path, metadata, command, and CLAUDE checks continue to run.
+- Keep `CLAUDE.md` as the single `@AGENTS.md` import. It may explain discovery, but
+  must not copy product facts that belong in the derivation-required section.
+- Run `npm test -- --run scripts/agent-doc-contract.test.mjs` after editing these
+  files. It verifies the canonical universal content, marker structure, derivation
+  metadata, literal repository paths, npm scripts, the single `@AGENTS.md` import, and
+  this skill's machine-readable contract anchors.
+
+### Audit the remaining inherited documents
+
+- `.claude/rules/*.md`: update examples and paths to deleted entrypoints or sample
+  files
 - `README.md` and `docs/README.ja.md`: identity, capabilities, screenshots, quick
   start, development paths, permissions, and release instructions
 - `docs/adr/`: retain decisions the product still adopts, rewrite product-specific
@@ -188,8 +250,6 @@ Classify every inherited document as **keep**, **rewrite for the product**, or
   and response expectations
 - `docs/releasing.md`, `docs/releasing.ja.md`, and
   `.claude/skills/release/SKILL.md`: actual release and distribution policy
-- `.claude/skills/add-entrypoint/SKILL.md` and the AGENTS.md on-demand table: remove or
-  update references to deleted wiring and skills
 - `docs/store/privacy-policy.md`, `store-listing.md`, and `manual-test.md`: replace
   every placeholder and HTML comment before a Store release; reconcile permissions
   with the built manifest and stored data with the implementation
@@ -213,7 +273,10 @@ Adaptation is complete only when all of these are true:
 3. `npm run verify:full` passes against the final selected surfaces.
 4. The built manifest contains only intended surfaces, permissions, URL matches, and
    generated resources.
-5. No sample behavior, stale path, placeholder, or unsupported documentation claim
-   remains.
-6. The final report lists retained surfaces, deleted layers, effective permissions,
+5. `npm test -- --run scripts/agent-doc-contract.test.mjs` passes; its canonical
+   universal-content check and derivation metadata plus literal path/command checks
+   match the final tree.
+6. No sample behavior, stale path, orphaned skill reference, placeholder, or
+   unsupported documentation claim remains.
+7. The final report lists retained surfaces, deleted layers, effective permissions,
    persistence, verification commands, and any deliberately deferred Store work.
