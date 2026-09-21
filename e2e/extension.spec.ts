@@ -14,7 +14,7 @@ const extensionPageUrl = (extensionId: string, path: string): string =>
 const routeProductionPage = async (page: Page): Promise<void> => {
   await page.route(PRODUCTION_PAGE_URL, async (route) => {
     await route.fulfill({
-      body: '<!doctype html><html><body><main>E2E fixture page</main></body></html>',
+      body: '<!doctype html><html><body><div><h1>Example Domain</h1></div></body></html>',
       contentType: 'text/html; charset=utf-8',
       status: 200,
     });
@@ -39,17 +39,12 @@ test.describe('default sample configuration', () => {
 
     await extensionPage.evaluate((hostSelector) => {
       const host = document.querySelector(hostSelector);
-      host?.remove();
+      host?.replaceWith(host.cloneNode(true));
     }, CONTENT_SAMPLE_HOST_SELECTOR);
 
     await expect(
       extensionPage.getByRole('heading', { name: 'content_script sample' }),
     ).toBeVisible();
-
-    await extensionPage.evaluate(async () => {
-      window.dispatchEvent(new PopStateEvent('popstate'));
-      await new Promise((resolve) => window.setTimeout(resolve, 150));
-    });
 
     await expect(
       extensionPage.locator(CONTENT_SAMPLE_HOST_SELECTOR),

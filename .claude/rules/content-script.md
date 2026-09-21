@@ -117,6 +117,7 @@ import { findFeatureScopes } from './featureAdapter';
 
 const HOST_ATTRIBUTE = 'data-my-extension-widget';
 const RECONCILE_DELAY_MS = 100;
+const RECONCILE_MAX_WAIT_MS = 1_000;
 const WINDOW_NAVIGATION_EVENTS = ['popstate', 'pageshow'] as const;
 const SITE_NAVIGATION_EVENTS = ['turbo:load', 'pjax:end', 'soft-nav:end'] as const;
 
@@ -151,6 +152,7 @@ const mountFeature = (scope: HTMLElement): MountedFeature => {
 export const startContentScript = (): (() => void) => {
   const mounts = new Map<HTMLElement, MountedFeature>();
   let reconcileTimer: number | undefined;
+  let maxWaitTimer: number | undefined;
 
   const reconcile = (): void => {
     const currentScopes = new Set(findFeatureScopes(document));
@@ -164,19 +166,36 @@ export const startContentScript = (): (() => void) => {
     }
 
     for (const scope of currentScopes) {
-      if (
-        mounts.has(scope) ||
-        scope.querySelector(`:scope > [${HOST_ATTRIBUTE}]`)
-      ) {
-        continue;
+      if (mounts.has(scope)) continue;
+
+      const hostSelector = `:scope > [${HOST_ATTRIBUTE}]`;
+      const untrackedHost = scope.querySelector<HTMLElement>(hostSelector);
+      if (untrackedHost) {
+        if (untrackedHost.shadowRoot) continue;
+        untrackedHost.remove();
       }
       mounts.set(scope, mountFeature(scope));
     }
   };
 
+  const runScheduledReconcile = (): void => {
+    window.clearTimeout(reconcileTimer);
+    window.clearTimeout(maxWaitTimer);
+    reconcileTimer = undefined;
+    maxWaitTimer = undefined;
+    reconcile();
+  };
+
   const scheduleReconcile = (): void => {
     window.clearTimeout(reconcileTimer);
-    reconcileTimer = window.setTimeout(reconcile, RECONCILE_DELAY_MS);
+    reconcileTimer = window.setTimeout(
+      runScheduledReconcile,
+      RECONCILE_DELAY_MS,
+    );
+    maxWaitTimer ??= window.setTimeout(
+      runScheduledReconcile,
+      RECONCILE_MAX_WAIT_MS,
+    );
   };
 
   const observer = new MutationObserver(scheduleReconcile);
@@ -192,6 +211,7 @@ export const startContentScript = (): (() => void) => {
   return () => {
     observer.disconnect();
     window.clearTimeout(reconcileTimer);
+    window.clearTimeout(maxWaitTimer);
     for (const eventName of WINDOW_NAVIGATION_EVENTS) {
       window.removeEventListener(eventName, scheduleReconcile);
     }
@@ -212,7 +232,8 @@ startContentScript();
 Only keep site-specific events the target application actually emits. Use
 `popstate` for History API traversal and `pageshow` for initial display and
 back-forward cache restoration. A custom event complements the observer; it does
-not replace reconciliation.
+not replace reconciliation. Always pair the quiet-period debounce with a maximum
+wait so continuous host-page mutations cannot starve reconciliation.
 
 ## 4. Verification checklist
 
