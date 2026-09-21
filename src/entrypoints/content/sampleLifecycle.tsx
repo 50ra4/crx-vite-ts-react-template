@@ -6,6 +6,7 @@ import { findSampleInsertionPoint } from './sampleAdapter';
 
 const SAMPLE_HOST_ATTRIBUTE = 'data-crx-content-script-sample';
 const RECONCILE_DELAY_MS = 100;
+const RECONCILE_MAX_WAIT_MS = 1_000;
 const NAVIGATION_EVENTS = ['popstate', 'pageshow'] as const;
 
 type MountedSample = {
@@ -46,6 +47,7 @@ const mountSample = (insertionPoint: Element): MountedSample => {
 export const startSample = (): (() => void) => {
   let mountedSample: MountedSample | undefined;
   let reconcileTimer: number | undefined;
+  let maxWaitTimer: number | undefined;
 
   const reconcile = (): void => {
     const insertionPoint = findSampleInsertionPoint(document);
@@ -59,20 +61,37 @@ export const startSample = (): (() => void) => {
       mountedSample = undefined;
     }
 
-    if (
-      !insertionPoint ||
-      mountedSample ||
-      insertionPoint.querySelector(`[${SAMPLE_HOST_ATTRIBUTE}]`)
-    ) {
-      return;
+    if (!insertionPoint || mountedSample) return;
+
+    const untrackedHost = insertionPoint.querySelector<HTMLElement>(
+      `[${SAMPLE_HOST_ATTRIBUTE}]`,
+    );
+    if (untrackedHost) {
+      if (untrackedHost.shadowRoot) return;
+      untrackedHost.remove();
     }
 
     mountedSample = mountSample(insertionPoint);
   };
 
+  const runScheduledReconcile = (): void => {
+    window.clearTimeout(reconcileTimer);
+    window.clearTimeout(maxWaitTimer);
+    reconcileTimer = undefined;
+    maxWaitTimer = undefined;
+    reconcile();
+  };
+
   const scheduleReconcile = (): void => {
     window.clearTimeout(reconcileTimer);
-    reconcileTimer = window.setTimeout(reconcile, RECONCILE_DELAY_MS);
+    reconcileTimer = window.setTimeout(
+      runScheduledReconcile,
+      RECONCILE_DELAY_MS,
+    );
+    maxWaitTimer ??= window.setTimeout(
+      runScheduledReconcile,
+      RECONCILE_MAX_WAIT_MS,
+    );
   };
 
   const observer = new MutationObserver(scheduleReconcile);
@@ -88,6 +107,7 @@ export const startSample = (): (() => void) => {
   return () => {
     observer.disconnect();
     window.clearTimeout(reconcileTimer);
+    window.clearTimeout(maxWaitTimer);
     for (const eventName of NAVIGATION_EVENTS) {
       window.removeEventListener(eventName, scheduleReconcile);
     }
