@@ -8,7 +8,31 @@ entrypoints から利用する共有モジュールの置き場です。
 
 テストでは `src/lib/testing/chromeFake.ts` の `installChromeFake` を使う。runtime
 messaging と storage(local / managed / session / sync)を in-memory で再現し、
-`vi.stubGlobal` でテストごとに注入できる。
+`vi.stubGlobal` でテストごとに注入できる。`activeTab`、
+`executeScriptResult`、`executeScriptError` を指定すれば、`tabs.query` と
+`scripting.executeScript` も再現できる。
+
+## activeTab + scripting によるページ注入
+
+ページに常駐する content script が不要なら、次の順序で `src/lib/` 内に注入処理を
+実装する。
+
+1. `chrome.tabs.query({ active: true, currentWindow: true })` で対象タブを取得する
+2. タブ ID の欠落と `chrome:` など注入禁止 URL を拒否する
+3. `chrome.scripting.executeScript` で対象タブへ関数を注入する
+4. 戻り値を `unknown` として型ガードで検証してから利用する
+
+テストでは個別に Chrome API をモックせず、次のように fake の入出力だけを指定する。
+
+```ts
+installChromeFake({
+  activeTab: { id: 42, url: 'https://example.com/form' },
+  executeScriptResult: [{ frameId: 0, result: { ok: true } }],
+});
+```
+
+成功、注入禁止 URL、不正な戻り値のサンプルは
+`src/lib/testing/chromeFake.test.ts` を参照する。
 
 ## messaging(`src/lib/messaging/`)
 
