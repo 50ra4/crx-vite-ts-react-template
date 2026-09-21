@@ -6,6 +6,7 @@ const PRODUCTION_PAGE_URL = 'https://example.com/e2e-fixture';
 const EXTENSION_ORIGIN = 'chrome-extension://';
 const E2E_HOST_PERMISSION = 'https://example.com/*';
 const OVERRIDDEN_EXTENSION_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const CONTENT_SAMPLE_HOST_SELECTOR = '[data-crx-content-script-sample]';
 
 const extensionPageUrl = (extensionId: string, path: string): string =>
   `${EXTENSION_ORIGIN}${extensionId}/${path}`;
@@ -35,6 +36,19 @@ test.describe('default sample configuration', () => {
     await expect(
       extensionPage.getByRole('heading', { name: 'content_script sample' }),
     ).toBeVisible();
+
+    await extensionPage.evaluate((hostSelector) => {
+      const host = document.querySelector(hostSelector);
+      host?.remove();
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, CONTENT_SAMPLE_HOST_SELECTOR);
+
+    await expect(
+      extensionPage.getByRole('heading', { name: 'content_script sample' }),
+    ).toBeVisible();
+    await expect(
+      extensionPage.locator(CONTENT_SAMPLE_HOST_SELECTOR),
+    ).toHaveCount(1);
   });
 });
 

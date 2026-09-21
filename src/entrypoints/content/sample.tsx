@@ -1,23 +1,99 @@
 import React, { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root as ReactRoot } from 'react-dom/client';
+
+import sampleCss from './sample.css?inline';
+import { findSampleInsertionPoint } from './sampleAdapter';
+
+const SAMPLE_HOST_ATTRIBUTE = 'data-crx-content-script-sample';
+const RECONCILE_DELAY_MS = 100;
+const NAVIGATION_EVENTS = ['popstate', 'pageshow'] as const;
+
+type MountedSample = {
+  host: HTMLElement;
+  root: ReactRoot;
+};
 
 const Root = () => {
   return (
-    <>
+    <section className="sample">
       <h1>content_script sample</h1>
       <p>This is being displayed by chrome-extension content_script</p>
-    </>
+    </section>
   );
 };
 
-const render = () => {
-  const root = document.createElement('div');
-  document.body.prepend(root);
-  createRoot(root).render(
+const mountSample = (insertionPoint: Element): MountedSample => {
+  const host = document.createElement('div');
+  host.setAttribute(SAMPLE_HOST_ATTRIBUTE, '');
+
+  const shadowRoot = host.attachShadow({ mode: 'open' });
+  const style = document.createElement('style');
+  style.textContent = sampleCss;
+  const mountPoint = document.createElement('div');
+  shadowRoot.append(style, mountPoint);
+  insertionPoint.prepend(host);
+
+  const root = createRoot(mountPoint);
+  root.render(
     <StrictMode>
       <Root />
     </StrictMode>,
   );
+
+  return { host, root };
 };
 
-render();
+export const startSample = (): (() => void) => {
+  let mountedSample: MountedSample | undefined;
+  let reconcileTimer: number | undefined;
+
+  const reconcile = (): void => {
+    const insertionPoint = findSampleInsertionPoint(document);
+
+    if (
+      mountedSample &&
+      (!insertionPoint || mountedSample.host.parentElement !== insertionPoint)
+    ) {
+      mountedSample.root.unmount();
+      mountedSample.host.remove();
+      mountedSample = undefined;
+    }
+
+    if (
+      !insertionPoint ||
+      mountedSample ||
+      insertionPoint.querySelector(`[${SAMPLE_HOST_ATTRIBUTE}]`)
+    ) {
+      return;
+    }
+
+    mountedSample = mountSample(insertionPoint);
+  };
+
+  const scheduleReconcile = (): void => {
+    window.clearTimeout(reconcileTimer);
+    reconcileTimer = window.setTimeout(reconcile, RECONCILE_DELAY_MS);
+  };
+
+  const observer = new MutationObserver(scheduleReconcile);
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+  for (const eventName of NAVIGATION_EVENTS) {
+    window.addEventListener(eventName, scheduleReconcile);
+  }
+  reconcile();
+
+  return () => {
+    observer.disconnect();
+    window.clearTimeout(reconcileTimer);
+    for (const eventName of NAVIGATION_EVENTS) {
+      window.removeEventListener(eventName, scheduleReconcile);
+    }
+    mountedSample?.root.unmount();
+    mountedSample?.host.remove();
+  };
+};
+
+startSample();
