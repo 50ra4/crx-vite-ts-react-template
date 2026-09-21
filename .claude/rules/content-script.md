@@ -166,14 +166,13 @@ export const startContentScript = (): (() => void) => {
     }
 
     for (const scope of currentScopes) {
-      if (mounts.has(scope)) continue;
-
       const hostSelector = `:scope > [${HOST_ATTRIBUTE}]`;
-      const untrackedHost = scope.querySelector<HTMLElement>(hostSelector);
-      if (untrackedHost) {
-        if (untrackedHost.shadowRoot) continue;
-        untrackedHost.remove();
+      const candidateHosts = scope.querySelectorAll<HTMLElement>(hostSelector);
+      for (const candidateHost of candidateHosts) {
+        if (!candidateHost.shadowRoot) candidateHost.remove();
       }
+
+      if (mounts.has(scope) || scope.querySelector(hostSelector)) continue;
       mounts.set(scope, mountFeature(scope));
     }
   };
@@ -233,7 +232,9 @@ Only keep site-specific events the target application actually emits. Use
 `popstate` for History API traversal and `pageshow` for initial display and
 back-forward cache restoration. A custom event complements the observer; it does
 not replace reconciliation. Always pair the quiet-period debounce with a maximum
-wait so continuous host-page mutations cannot starve reconciliation.
+wait so continuous host-page mutations cannot starve reconciliation. Scope host
+queries to direct children and remove every marker-only clone on each pass so
+host-page markup round-trips converge to one live mount.
 
 ## 4. Verification checklist
 

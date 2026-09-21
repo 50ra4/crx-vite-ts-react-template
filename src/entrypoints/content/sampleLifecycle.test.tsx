@@ -67,20 +67,42 @@ describe('startSample', () => {
     expect(hosts[0]?.shadowRoot).not.toBeNull();
   });
 
-  test('reconciles when popstate fires without a DOM mutation', async () => {
-    const findInsertionPoint = vi.spyOn(
-      sampleAdapter,
-      'findSampleInsertionPoint',
-    );
+  test('removes every marker-only clone while the live host remains', async () => {
     stopSample = startSample();
+    const insertionPoint = document.querySelector('main');
+    const liveHost = document.querySelector<HTMLElement>(SAMPLE_HOST_SELECTOR);
+
+    if (!insertionPoint || !liveHost) {
+      throw new Error('Expected the mounted sample fixture.');
+    }
+    for (let index = 0; index < 4; index += 1) {
+      insertionPoint.append(liveHost.cloneNode(true));
+    }
     await Promise.resolve();
     await vi.advanceTimersByTimeAsync(100);
-    findInsertionPoint.mockClear();
 
-    window.history.pushState({}, '', '/next');
-    window.dispatchEvent(new PopStateEvent('popstate'));
-    await vi.advanceTimersByTimeAsync(100);
-
-    expect(findInsertionPoint).toHaveBeenCalledTimes(1);
+    const hosts = insertionPoint.querySelectorAll(SAMPLE_HOST_SELECTOR);
+    expect(hosts).toHaveLength(1);
+    expect(hosts[0]).toBe(liveHost);
   });
+
+  test.each(['popstate', 'pageshow'])(
+    'reconciles when %s fires without a DOM mutation',
+    async (eventName) => {
+      const findInsertionPoint = vi.spyOn(
+        sampleAdapter,
+        'findSampleInsertionPoint',
+      );
+      stopSample = startSample();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(100);
+      findInsertionPoint.mockClear();
+
+      window.history.pushState({}, '', `/${eventName}`);
+      window.dispatchEvent(new Event(eventName));
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(findInsertionPoint).toHaveBeenCalledTimes(1);
+    },
+  );
 });

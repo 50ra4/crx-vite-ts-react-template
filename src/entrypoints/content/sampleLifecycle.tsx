@@ -61,16 +61,18 @@ export const startSample = (): (() => void) => {
       mountedSample = undefined;
     }
 
-    if (!insertionPoint || mountedSample) return;
+    if (!insertionPoint) return;
 
-    const untrackedHost = insertionPoint.querySelector<HTMLElement>(
-      `[${SAMPLE_HOST_ATTRIBUTE}]`,
-    );
-    if (untrackedHost) {
-      if (untrackedHost.shadowRoot) return;
-      untrackedHost.remove();
+    const hostSelector = `:scope > [${SAMPLE_HOST_ATTRIBUTE}]`;
+    const candidateHosts =
+      insertionPoint.querySelectorAll<HTMLElement>(hostSelector);
+    for (const candidateHost of candidateHosts) {
+      if (candidateHost !== mountedSample?.host && !candidateHost.shadowRoot) {
+        candidateHost.remove();
+      }
     }
 
+    if (mountedSample || insertionPoint.querySelector(hostSelector)) return;
     mountedSample = mountSample(insertionPoint);
   };
 
