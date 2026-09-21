@@ -248,6 +248,10 @@ const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
     injection.files.length > 0 &&
     injection.files.every((file) => typeof file === 'string');
 
+  if (injection.args !== undefined && !hasFunc) {
+    throw new TypeError("Cannot specify 'args' without 'func'.");
+  }
+
   if (hasFunc === hasFiles) {
     throw new TypeError('Exactly one of files and func must be specified.');
   }
@@ -371,7 +375,9 @@ export const createChromeFake = (
   }
 
   const configuredWindowIds = new Set(
-    (options.tabs ?? []).map((tab) => tab.windowId ?? 1),
+    (options.tabs ?? [])
+      .map((tab) => tab.windowId)
+      .filter((windowId): windowId is number => windowId !== undefined),
   );
   if (
     options.tabs &&
@@ -398,8 +404,9 @@ export const createChromeFake = (
     ? options.tabs.map((tab) => {
         const windowId = tab.windowId ?? currentWindowId;
         const index = tabIndexesByWindow.get(windowId) ?? 0;
-        tabIndexesByWindow.set(windowId, index + 1);
-        return createTab(tab, { active: false, index, windowId });
+        const createdTab = createTab(tab, { active: false, index, windowId });
+        tabIndexesByWindow.set(windowId, Math.max(index, createdTab.index + 1));
+        return createdTab;
       })
     : options.activeTab
       ? [

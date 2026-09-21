@@ -223,10 +223,7 @@ describe('Chrome fake', () => {
 
   it('assigns tab indexes per window and infers a sole current window', async () => {
     const singleWindowFake = createChromeFake({
-      tabs: [
-        { active: true, id: 1, windowId: 7 },
-        { id: 2, windowId: 7 },
-      ],
+      tabs: [{ active: true, id: 1, windowId: 7 }, { id: 2 }],
     });
 
     await expect(
@@ -251,6 +248,14 @@ describe('Chrome fake', () => {
       expect.objectContaining({ id: 1, index: 0 }),
       expect.objectContaining({ id: 2, index: 0 }),
       expect.objectContaining({ id: 3, index: 1 }),
+    ]);
+
+    const explicitIndexFake = createChromeFake({
+      tabs: [{ id: 1, index: 1 }, { id: 2 }],
+    });
+    await expect(explicitIndexFake.chrome.tabs.query({})).resolves.toEqual([
+      expect.objectContaining({ id: 1, index: 1 }),
+      expect.objectContaining({ id: 2, index: 2 }),
     ]);
   });
 
@@ -310,6 +315,13 @@ describe('Chrome fake', () => {
         func,
       }),
     ).rejects.toThrow('Exactly one of files and func must be specified.');
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        files: ['content.js'],
+        args: [1],
+      }),
+    ).rejects.toThrow("Cannot specify 'args' without 'func'.");
     await expect(
       fake.chrome.scripting.executeScript({
         target: { tabId: 42 },
