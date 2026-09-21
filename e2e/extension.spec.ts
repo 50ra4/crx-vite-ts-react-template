@@ -40,12 +40,17 @@ test.describe('default sample configuration', () => {
     await extensionPage.evaluate((hostSelector) => {
       const host = document.querySelector(hostSelector);
       host?.remove();
-      window.dispatchEvent(new PopStateEvent('popstate'));
     }, CONTENT_SAMPLE_HOST_SELECTOR);
 
     await expect(
       extensionPage.getByRole('heading', { name: 'content_script sample' }),
     ).toBeVisible();
+
+    await extensionPage.evaluate(async () => {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+    });
+
     await expect(
       extensionPage.locator(CONTENT_SAMPLE_HOST_SELECTOR),
     ).toHaveCount(1);

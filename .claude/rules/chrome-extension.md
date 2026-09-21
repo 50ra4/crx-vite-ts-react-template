@@ -18,8 +18,10 @@ MV3 facts specific to this repo:
   from a UI surface, and register handlers with `addMessageListeners({...})` in the
   background worker — see `entrypoints/popup/popup.tsx` + `entrypoints/background/background.ts`.
   The layer enforces `sender.id === chrome.runtime.id` and runtime payload guards by default.
-- Content scripts have no host HTML: create a DOM node, `document.body.prepend(root)`,
-  then `createRoot(root).render(...)` — see `src/entrypoints/content/sample.tsx`.
+- Content scripts have no host HTML. For resilient host-page injection, including
+  SPA navigation, debounced reconciliation, idempotent mounts, Shadow DOM, and
+  HTML fixture tests, follow `.claude/rules/content-script.md`. The runnable
+  minimum is `src/entrypoints/content/sample.tsx`.
 - A content script's `matches` and `js` entries both live in `manifest.config.ts`
   under `content_scripts[]` (e.g. `{ matches: [...], js: ['src/entrypoints/content/sample.tsx'] }`).
 - Chrome APIs are typed via `@types/chrome`.
