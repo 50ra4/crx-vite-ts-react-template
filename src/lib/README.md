@@ -13,7 +13,8 @@ messaging と storage(local / managed / session / sync)を in-memory で再現�
 `scripting.executeScript` も再現できる。複数ウィンドウやクエリ条件は `tabs` と
 `currentWindowId` / `lastFocusedWindowId` で設定する。対応する query 条件は
 `active`、`currentWindow`、`lastFocusedWindow`、`windowId`、`url`。未対応条件は
-黙って無視せずエラーにする。
+黙って無視せずエラーにする。`tabs` が単一ウィンドウならその ID を current window
+として推論し、複数ウィンドウなら `currentWindowId` を必須とする。
 
 ## activeTab + scripting によるページ注入
 

@@ -84,67 +84,73 @@ const createTab = (
 const escapeRegularExpression = (value: string): string =>
   value.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
 
-const matchesUrlPattern = (url: string, pattern: string): boolean => {
-  if (pattern === '<all_urls>') {
-    try {
-      return ['file:', 'http:', 'https:'].includes(new URL(url).protocol);
-    } catch {
-      return false;
-    }
-  }
-
-  const patternParts =
-    /^([^:]+):\/\/(\[[^\]]+\]|[^/:]*)(?::(\*|\d+))?(\/.*)$/.exec(pattern);
-  if (!patternParts) {
-    return false;
-  }
-
-  const [, schemePattern, hostPattern, portPattern, pathPattern] = patternParts;
-
-  try {
-    const parsedUrl = new URL(url);
-    const scheme = parsedUrl.protocol.slice(0, -1);
-    const schemeMatches =
-      schemePattern === '*'
-        ? scheme === 'http' || scheme === 'https'
-        : schemePattern === scheme;
-    if (!schemeMatches) {
-      return false;
-    }
-
-    const hostname = parsedUrl.hostname.toLowerCase();
-    const normalizedHostPattern = hostPattern.toLowerCase();
-    const hostMatches = normalizedHostPattern.startsWith('*.')
-      ? hostname === normalizedHostPattern.slice(2) ||
-        hostname.endsWith(`.${normalizedHostPattern.slice(2)}`)
-      : normalizedHostPattern === '*' || hostname === normalizedHostPattern;
-    if (!hostMatches) {
-      return false;
-    }
-
-    const defaultPorts: Readonly<Record<string, string>> = {
-      http: '80',
-      https: '443',
+type ParsedUrlPattern =
+  | { allUrls: true }
+  | {
+      allUrls: false;
+      host: string;
+      path: string;
+      scheme: string;
     };
-    const urlPort = parsedUrl.port || defaultPorts[scheme];
-    if (
-      portPattern !== undefined &&
-      portPattern !== '*' &&
-      portPattern !== urlPort
-    ) {
-      return false;
-    }
 
-    const pathExpression = escapeRegularExpression(pathPattern).replaceAll(
-      '*',
-      '.*',
-    );
-    return new RegExp(`^${pathExpression}$`).test(
-      `${parsedUrl.pathname}${parsedUrl.search}`,
-    );
-  } catch {
+const parseUrlPattern = (pattern: string): ParsedUrlPattern => {
+  if (pattern === '<all_urls>') {
+    return { allUrls: true };
+  }
+
+  const patternParts = /^(http|https|file|\*):\/\/([^/:]*)(\/.*)$/.exec(
+    pattern,
+  );
+  if (!patternParts) {
+    throw new TypeError(`Invalid Chrome match pattern: ${pattern}`);
+  }
+
+  const [, scheme, host, path] = patternParts;
+  const hostWildcardIsValid =
+    !host.includes('*') || host === '*' || /^\*\.[^*]+$/.test(host);
+  const hostIsValid =
+    scheme === 'file' ? host === '' : host.length > 0 && hostWildcardIsValid;
+  if (!hostIsValid) {
+    throw new TypeError(`Invalid Chrome match pattern: ${pattern}`);
+  }
+
+  return { allUrls: false, host, path, scheme };
+};
+
+const matchesUrlPattern = (url: string, pattern: string): boolean => {
+  const parsedPattern = parseUrlPattern(pattern);
+  const parsedUrl = new URL(url);
+
+  if (parsedPattern.allUrls) {
+    return ['file:', 'http:', 'https:'].includes(parsedUrl.protocol);
+  }
+
+  const scheme = parsedUrl.protocol.slice(0, -1);
+  const schemeMatches =
+    parsedPattern.scheme === '*'
+      ? scheme === 'http' || scheme === 'https'
+      : parsedPattern.scheme === scheme;
+  if (!schemeMatches) {
     return false;
   }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const normalizedHostPattern = parsedPattern.host.toLowerCase();
+  const hostMatches = normalizedHostPattern.startsWith('*.')
+    ? hostname === normalizedHostPattern.slice(2) ||
+      hostname.endsWith(`.${normalizedHostPattern.slice(2)}`)
+    : normalizedHostPattern === '*' || hostname === normalizedHostPattern;
+  if (!hostMatches) {
+    return false;
+  }
+
+  const pathExpression = escapeRegularExpression(parsedPattern.path).replaceAll(
+    '*',
+    '.*',
+  );
+  return new RegExp(`^${pathExpression}$`).test(
+    `${parsedUrl.pathname}${parsedUrl.search}`,
+  );
 };
 
 const supportedTabQueryFilters = new Set([
@@ -160,6 +166,13 @@ const assertSupportedTabQuery = (queryInfo: chrome.tabs.QueryInfo): void => {
     if (value !== undefined && !supportedTabQueryFilters.has(key)) {
       throw new TypeError(`Unsupported chrome.tabs.query filter: ${key}`);
     }
+  }
+
+  if (queryInfo.url !== undefined) {
+    const patterns = Array.isArray(queryInfo.url)
+      ? queryInfo.url
+      : [queryInfo.url];
+    patterns.forEach(parseUrlPattern);
   }
 };
 
@@ -236,7 +249,7 @@ const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
     injection.files.every((file) => typeof file === 'string');
 
   if (hasFunc === hasFiles) {
-    throw new TypeError("Exactly one of 'func' and 'files' must be specified.");
+    throw new TypeError('Exactly one of files and func must be specified.');
   }
 };
 
@@ -357,14 +370,37 @@ export const createChromeFake = (
     throw new TypeError('activeTab and tabs cannot be used together.');
   }
 
+  const configuredWindowIds = new Set(
+    (options.tabs ?? []).map((tab) => tab.windowId ?? 1),
+  );
+  if (
+    options.tabs &&
+    options.currentWindowId === undefined &&
+    configuredWindowIds.size > 1
+  ) {
+    throw new TypeError(
+      'currentWindowId is required for multiple windows in tabs.',
+    );
+  }
+  const soleConfiguredWindowId =
+    configuredWindowIds.size === 1
+      ? configuredWindowIds.values().next().value
+      : undefined;
   const currentWindowId =
-    options.currentWindowId ?? options.activeTab?.windowId ?? 1;
+    options.currentWindowId ??
+    options.activeTab?.windowId ??
+    soleConfiguredWindowId ??
+    1;
   const lastFocusedWindowId = options.lastFocusedWindowId ?? currentWindowId;
   const extensionId = options.extensionId ?? 'test-extension-id';
+  const tabIndexesByWindow = new Map<number, number>();
   const tabs = options.tabs
-    ? options.tabs.map((tab, index) =>
-        createTab(tab, { active: false, index, windowId: currentWindowId }),
-      )
+    ? options.tabs.map((tab) => {
+        const windowId = tab.windowId ?? currentWindowId;
+        const index = tabIndexesByWindow.get(windowId) ?? 0;
+        tabIndexesByWindow.set(windowId, index + 1);
+        return createTab(tab, { active: false, index, windowId });
+      })
     : options.activeTab
       ? [
           createTab(options.activeTab, {
@@ -432,11 +468,11 @@ export const createChromeFake = (
     },
     scripting: {
       executeScript: vi.fn(async (injection: Record<string, unknown>) => {
+        assertSingleScriptSource(injection);
         const tabId = getTargetTabId(injection);
         if (!tabs.some((tab) => tab.id === tabId)) {
           throw new Error(`No tab with id: ${tabId}.`);
         }
-        assertSingleScriptSource(injection);
 
         if (options.executeScriptError) {
           throw options.executeScriptError;

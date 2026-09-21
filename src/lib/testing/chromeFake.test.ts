@@ -138,8 +138,27 @@ describe('Chrome fake', () => {
       tabs: [{ id: 3, url: 'https://example.com:8443/admin' }],
     });
     await expect(
-      portFake.chrome.tabs.query({ url: 'https://example.com:8443/*' }),
+      portFake.chrome.tabs.query({ url: 'https://example.com/*' }),
     ).resolves.toEqual([expect.objectContaining({ id: 3 })]);
+    await expect(
+      portFake.chrome.tabs.query({ url: 'https://example.com:8443/*' }),
+    ).rejects.toThrow('Invalid Chrome match pattern');
+  });
+
+  it('rejects malformed Chrome match patterns', async () => {
+    const fake = createChromeFake({
+      activeTab: { id: 1, url: 'https://example.com/' },
+    });
+
+    for (const pattern of [
+      'https://example.com',
+      'example.com/*',
+      'https://exa*.com/*',
+    ]) {
+      await expect(fake.chrome.tabs.query({ url: pattern })).rejects.toThrow(
+        `Invalid Chrome match pattern: ${pattern}`,
+      );
+    }
   });
 
   it('filters explicit and last-focused windows and rejects unsupported filters', async () => {
@@ -202,13 +221,60 @@ describe('Chrome fake', () => {
     expect(secondResult).not.toBe(firstResult);
   });
 
+  it('assigns tab indexes per window and infers a sole current window', async () => {
+    const singleWindowFake = createChromeFake({
+      tabs: [
+        { active: true, id: 1, windowId: 7 },
+        { id: 2, windowId: 7 },
+      ],
+    });
+
+    await expect(
+      singleWindowFake.chrome.tabs.query({ currentWindow: true }),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: 1, index: 0 }),
+      expect.objectContaining({ id: 2, index: 1 }),
+    ]);
+    await expect(
+      singleWindowFake.chrome.tabs.query({ windowId: -2 }),
+    ).resolves.toHaveLength(2);
+
+    const multipleWindowsFake = createChromeFake({
+      currentWindowId: 1,
+      tabs: [
+        { id: 1, windowId: 1 },
+        { id: 2, windowId: 2 },
+        { id: 3, windowId: 2 },
+      ],
+    });
+    await expect(multipleWindowsFake.chrome.tabs.query({})).resolves.toEqual([
+      expect.objectContaining({ id: 1, index: 0 }),
+      expect.objectContaining({ id: 2, index: 0 }),
+      expect.objectContaining({ id: 3, index: 1 }),
+    ]);
+  });
+
+  it('requires currentWindowId for tabs spanning multiple windows', () => {
+    expect(() =>
+      createChromeFake({
+        tabs: [
+          { id: 1, windowId: 2 },
+          { id: 2, windowId: 3 },
+        ],
+      }),
+    ).toThrow('currentWindowId is required for multiple windows');
+  });
+
   it('rejects script injection without a numeric target tab ID', async () => {
     const fake = createChromeFake({
       executeScriptResult: [{ frameId: 0, result: { filled: 1 } }],
     });
 
     await expect(
-      fake.chrome.scripting.executeScript({ target: {} }),
+      fake.chrome.scripting.executeScript({
+        target: {},
+        func: () => undefined,
+      }),
     ).rejects.toThrow('target.tabId');
   });
 
@@ -233,14 +299,17 @@ describe('Chrome fake', () => {
     ).rejects.toThrow('No tab with id: -1');
     await expect(
       fake.chrome.scripting.executeScript({ target: { tabId: 42 } }),
-    ).rejects.toThrow("Exactly one of 'func' and 'files'");
+    ).rejects.toThrow('Exactly one of files and func must be specified.');
+    await expect(
+      fake.chrome.scripting.executeScript({ target: { tabId: 999 } }),
+    ).rejects.toThrow('Exactly one of files and func must be specified.');
     await expect(
       fake.chrome.scripting.executeScript({
         target: { tabId: 42 },
         files: ['content.js'],
         func,
       }),
-    ).rejects.toThrow("Exactly one of 'func' and 'files'");
+    ).rejects.toThrow('Exactly one of files and func must be specified.');
     await expect(
       fake.chrome.scripting.executeScript({
         target: { tabId: 42 },
