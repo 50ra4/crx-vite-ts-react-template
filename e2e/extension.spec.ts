@@ -6,6 +6,7 @@ const PRODUCTION_PAGE_URL = 'https://example.com/e2e-fixture';
 const EXTENSION_ORIGIN = 'chrome-extension://';
 const E2E_HOST_PERMISSION = 'https://example.com/*';
 const OVERRIDDEN_EXTENSION_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const CONTENT_SAMPLE_HOST_SELECTOR = '[data-crx-content-script-sample]';
 
 const extensionPageUrl = (extensionId: string, path: string): string =>
   `${EXTENSION_ORIGIN}${extensionId}/${path}`;
@@ -13,7 +14,7 @@ const extensionPageUrl = (extensionId: string, path: string): string =>
 const routeProductionPage = async (page: Page): Promise<void> => {
   await page.route(PRODUCTION_PAGE_URL, async (route) => {
     await route.fulfill({
-      body: '<!doctype html><html><body><main>E2E fixture page</main></body></html>',
+      body: '<!doctype html><html><body><div><h1>Example Domain</h1></div></body></html>',
       contentType: 'text/html; charset=utf-8',
       status: 200,
     });
@@ -35,6 +36,19 @@ test.describe('default sample configuration', () => {
     await expect(
       extensionPage.getByRole('heading', { name: 'content_script sample' }),
     ).toBeVisible();
+
+    await extensionPage.evaluate((hostSelector) => {
+      const host = document.querySelector(hostSelector);
+      host?.replaceWith(host.cloneNode(true));
+    }, CONTENT_SAMPLE_HOST_SELECTOR);
+
+    await expect(
+      extensionPage.getByRole('heading', { name: 'content_script sample' }),
+    ).toBeVisible();
+
+    await expect(
+      extensionPage.locator(CONTENT_SAMPLE_HOST_SELECTOR),
+    ).toHaveCount(1);
   });
 });
 

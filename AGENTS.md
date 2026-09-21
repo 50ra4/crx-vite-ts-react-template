@@ -192,6 +192,7 @@ Read these only when the row matches the task:
 | --- | --- |
 | editing any `.ts`/`.tsx` file | `.claude/rules/typescript-react.md` |
 | touching `manifest.config.ts`, background, or content scripts | `.claude/rules/chrome-extension.md` |
+| implementing DOM injection, SPA navigation handling, or Shadow DOM in a content script | `.claude/rules/content-script.md` |
 | writing tests | `.claude/rules/testing.md` |
 | adding an extension surface (popup/options/background/content script) | `.claude/skills/add-entrypoint/SKILL.md` |
 | pruning surfaces, setting product identity, or auditing inherited docs while turning this template into a real extension | `.claude/skills/adapt-template/SKILL.md` |
