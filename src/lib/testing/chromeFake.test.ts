@@ -1,11 +1,87 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createChromeFake } from './chromeFake';
+import { createChromeFake, installChromeFake } from './chromeFake';
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
+type SampleInjectionResult = {
+  filled: number;
+};
+
+const isSampleInjectionResult = (
+  value: unknown,
+): value is SampleInjectionResult =>
+  typeof value === 'object' &&
+  value !== null &&
+  'filled' in value &&
+  typeof value.filled === 'number';
+
+const executeInActiveTab = async (): Promise<SampleInjectionResult | null> => {
+  const [activeTab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  if (
+    typeof activeTab?.id !== 'number' ||
+    !activeTab.url?.startsWith('https://')
+  ) {
+    return null;
+  }
+
+  const [injectionResult] = await chrome.scripting.executeScript({
+    target: { tabId: activeTab.id },
+    func: (result: SampleInjectionResult) => result,
+    args: [{ filled: 1 }],
+  });
+
+  return isSampleInjectionResult(injectionResult?.result)
+    ? injectionResult.result
+    : null;
+};
+
 describe('Chrome fake', () => {
+  it('supports the activeTab + scripting injection recipe without custom mocks', async () => {
+    installChromeFake({
+      activeTab: { id: 42, url: 'https://example.com/form' },
+      executeScriptResult: [{ frameId: 0, result: { filled: 1 } }],
+    });
+
+    await expect(executeInActiveTab()).resolves.toEqual({ filled: 1 });
+  });
+
+  it('supports restricted URL checks before script injection', async () => {
+    const fake = installChromeFake({
+      activeTab: { id: 42, url: 'chrome://settings' },
+    });
+
+    await expect(executeInActiveTab()).resolves.toBeNull();
+    expect(fake.chrome.scripting.executeScript).not.toHaveBeenCalled();
+  });
+
+  it('supports guarding untrusted script injection results', async () => {
+    installChromeFake({
+      activeTab: { id: 42, url: 'https://example.com/form' },
+      executeScriptResult: [{ frameId: 0, result: { filled: 'invalid' } }],
+    });
+
+    await expect(executeInActiveTab()).resolves.toBeNull();
+  });
+
+  it('returns no active tab by default and can reject script injection', async () => {
+    const injectionError = new Error('Injection denied');
+    const fake = createChromeFake({ executeScriptError: injectionError });
+
+    await expect(
+      fake.chrome.tabs.query({ active: true, currentWindow: true }),
+    ).resolves.toEqual([]);
+    await expect(
+      fake.chrome.scripting.executeScript({ target: { tabId: 42 } }),
+    ).rejects.toThrow('Injection denied');
+  });
+
   it('omits missing keys from string and array storage reads', async () => {
     const fake = createChromeFake();
     await fake.chrome.storage.local.set({ present: 'value' });

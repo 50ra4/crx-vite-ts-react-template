@@ -11,7 +11,15 @@ type StorageChangeListener = (
 ) => void;
 
 type ChromeFakeOptions = {
+  activeTab?: { id?: number; url?: string };
+  executeScriptError?: Error;
+  executeScriptResult?: ScriptInjectionResult[];
   extensionId?: string;
+};
+
+type ScriptInjectionResult = {
+  frameId: number;
+  result?: unknown;
 };
 
 export type ChromeFake = {
@@ -28,6 +36,11 @@ type ChromeApiFake = {
     };
     sendMessage: (message: unknown) => Promise<unknown>;
   };
+  scripting: {
+    executeScript: (
+      injection: Record<string, unknown>,
+    ) => Promise<ScriptInjectionResult[]>;
+  };
   storage: {
     local: chrome.storage.StorageArea;
     managed: chrome.storage.StorageArea;
@@ -37,6 +50,9 @@ type ChromeApiFake = {
       addListener: (listener: StorageChangeListener) => void;
       removeListener: (listener: StorageChangeListener) => void;
     };
+  };
+  tabs: {
+    query: (queryInfo: chrome.tabs.QueryInfo) => Promise<chrome.tabs.Tab[]>;
   };
 };
 
@@ -153,6 +169,7 @@ const createStorageArea = (
 export const createChromeFake = (
   options: ChromeFakeOptions = {},
 ): ChromeFake => {
+  const activeTab = options.activeTab;
   const extensionId = options.extensionId ?? 'test-extension-id';
   const runtimeListeners = new Set<RuntimeMessageListener>();
   const storageListeners = new Set<StorageChangeListener>();
@@ -210,6 +227,15 @@ export const createChromeFake = (
           }),
       ),
     },
+    scripting: {
+      executeScript: vi.fn(async (_injection: Record<string, unknown>) => {
+        if (options.executeScriptError) {
+          throw options.executeScriptError;
+        }
+
+        return options.executeScriptResult ?? [];
+      }),
+    },
     storage: {
       local: createStorageArea('local', emitStorageChanges),
       managed: createStorageArea('managed', emitStorageChanges),
@@ -223,6 +249,11 @@ export const createChromeFake = (
           storageListeners.delete(listener);
         }),
       },
+    },
+    tabs: {
+      query: vi.fn(async (_queryInfo: chrome.tabs.QueryInfo) =>
+        activeTab ? ([activeTab] as chrome.tabs.Tab[]) : [],
+      ),
     },
   };
 
