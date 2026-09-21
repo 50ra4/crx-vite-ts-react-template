@@ -16,6 +16,7 @@ type ChromeFakeOptions = {
   executeScriptError?: Error;
   executeScriptResult?: ScriptInjectionResult[];
   extensionId?: string;
+  lastFocusedWindowId?: number;
   tabs?: Partial<chrome.tabs.Tab>[];
 };
 
@@ -80,21 +81,93 @@ const createTab = (
   };
 };
 
+const escapeRegularExpression = (value: string): string =>
+  value.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+
 const matchesUrlPattern = (url: string, pattern: string): boolean => {
   if (pattern === '<all_urls>') {
-    return /^(?:file|ftp|https?):/.test(url);
+    try {
+      return ['file:', 'http:', 'https:'].includes(new URL(url).protocol);
+    } catch {
+      return false;
+    }
   }
 
-  const escapedPattern = pattern
-    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-    .replaceAll('*', '.*');
-  return new RegExp(`^${escapedPattern}$`).test(url.split('#')[0] ?? '');
+  const patternParts =
+    /^([^:]+):\/\/(\[[^\]]+\]|[^/:]*)(?::(\*|\d+))?(\/.*)$/.exec(pattern);
+  if (!patternParts) {
+    return false;
+  }
+
+  const [, schemePattern, hostPattern, portPattern, pathPattern] = patternParts;
+
+  try {
+    const parsedUrl = new URL(url);
+    const scheme = parsedUrl.protocol.slice(0, -1);
+    const schemeMatches =
+      schemePattern === '*'
+        ? scheme === 'http' || scheme === 'https'
+        : schemePattern === scheme;
+    if (!schemeMatches) {
+      return false;
+    }
+
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const normalizedHostPattern = hostPattern.toLowerCase();
+    const hostMatches = normalizedHostPattern.startsWith('*.')
+      ? hostname === normalizedHostPattern.slice(2) ||
+        hostname.endsWith(`.${normalizedHostPattern.slice(2)}`)
+      : normalizedHostPattern === '*' || hostname === normalizedHostPattern;
+    if (!hostMatches) {
+      return false;
+    }
+
+    const defaultPorts: Readonly<Record<string, string>> = {
+      http: '80',
+      https: '443',
+    };
+    const urlPort = parsedUrl.port || defaultPorts[scheme];
+    if (
+      portPattern !== undefined &&
+      portPattern !== '*' &&
+      portPattern !== urlPort
+    ) {
+      return false;
+    }
+
+    const pathExpression = escapeRegularExpression(pathPattern).replaceAll(
+      '*',
+      '.*',
+    );
+    return new RegExp(`^${pathExpression}$`).test(
+      `${parsedUrl.pathname}${parsedUrl.search}`,
+    );
+  } catch {
+    return false;
+  }
+};
+
+const supportedTabQueryFilters = new Set([
+  'active',
+  'currentWindow',
+  'lastFocusedWindow',
+  'url',
+  'windowId',
+]);
+
+const assertSupportedTabQuery = (queryInfo: chrome.tabs.QueryInfo): void => {
+  for (const [key, value] of Object.entries(queryInfo)) {
+    if (value !== undefined && !supportedTabQueryFilters.has(key)) {
+      throw new TypeError(`Unsupported chrome.tabs.query filter: ${key}`);
+    }
+  }
 };
 
 const matchesTabQuery = (
   tab: chrome.tabs.Tab,
   queryInfo: chrome.tabs.QueryInfo,
   currentWindowId: number,
+  lastFocusedWindowId: number,
 ): boolean => {
   if (queryInfo.active !== undefined && queryInfo.active !== tab.active) {
     return false;
@@ -105,6 +178,21 @@ const matchesTabQuery = (
     queryInfo.currentWindow !== (tab.windowId === currentWindowId)
   ) {
     return false;
+  }
+
+  if (
+    queryInfo.lastFocusedWindow !== undefined &&
+    queryInfo.lastFocusedWindow !== (tab.windowId === lastFocusedWindowId)
+  ) {
+    return false;
+  }
+
+  if (queryInfo.windowId !== undefined) {
+    const requestedWindowId =
+      queryInfo.windowId === -2 ? currentWindowId : queryInfo.windowId;
+    if (tab.windowId !== requestedWindowId) {
+      return false;
+    }
   }
 
   if (queryInfo.url !== undefined) {
@@ -123,15 +211,33 @@ const matchesTabQuery = (
   return true;
 };
 
-const hasNumericTargetTabId = (injection: Record<string, unknown>): boolean => {
+const getTargetTabId = (injection: Record<string, unknown>): number => {
   const target = injection.target;
-  return (
+  if (
     typeof target === 'object' &&
     target !== null &&
     'tabId' in target &&
     typeof target.tabId === 'number' &&
     Number.isInteger(target.tabId)
+  ) {
+    return target.tabId;
+  }
+
+  throw new TypeError(
+    'chrome.scripting.executeScript requires a numeric target.tabId.',
   );
+};
+
+const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
+  const hasFunc = typeof injection.func === 'function';
+  const hasFiles =
+    Array.isArray(injection.files) &&
+    injection.files.length > 0 &&
+    injection.files.every((file) => typeof file === 'string');
+
+  if (hasFunc === hasFiles) {
+    throw new TypeError("Exactly one of 'func' and 'files' must be specified.");
+  }
 };
 
 const getStoredValues = (
@@ -247,8 +353,13 @@ const createStorageArea = (
 export const createChromeFake = (
   options: ChromeFakeOptions = {},
 ): ChromeFake => {
+  if (options.activeTab && options.tabs) {
+    throw new TypeError('activeTab and tabs cannot be used together.');
+  }
+
   const currentWindowId =
     options.currentWindowId ?? options.activeTab?.windowId ?? 1;
+  const lastFocusedWindowId = options.lastFocusedWindowId ?? currentWindowId;
   const extensionId = options.extensionId ?? 'test-extension-id';
   const tabs = options.tabs
     ? options.tabs.map((tab, index) =>
@@ -321,19 +432,17 @@ export const createChromeFake = (
     },
     scripting: {
       executeScript: vi.fn(async (injection: Record<string, unknown>) => {
-        if (!hasNumericTargetTabId(injection)) {
-          throw new TypeError(
-            'chrome.scripting.executeScript requires a numeric target.tabId.',
-          );
+        const tabId = getTargetTabId(injection);
+        if (!tabs.some((tab) => tab.id === tabId)) {
+          throw new Error(`No tab with id: ${tabId}.`);
         }
+        assertSingleScriptSource(injection);
 
         if (options.executeScriptError) {
           throw options.executeScriptError;
         }
 
-        return (options.executeScriptResult ?? []).map((result) => ({
-          ...result,
-        }));
+        return structuredClone(options.executeScriptResult ?? []);
       }),
     },
     storage: {
@@ -351,11 +460,19 @@ export const createChromeFake = (
       },
     },
     tabs: {
-      query: vi.fn(async (queryInfo: chrome.tabs.QueryInfo) =>
-        tabs
-          .filter((tab) => matchesTabQuery(tab, queryInfo, currentWindowId))
-          .map((tab) => ({ ...tab })),
-      ),
+      query: vi.fn(async (queryInfo: chrome.tabs.QueryInfo) => {
+        assertSupportedTabQuery(queryInfo);
+        return tabs
+          .filter((tab) =>
+            matchesTabQuery(
+              tab,
+              queryInfo,
+              currentWindowId,
+              lastFocusedWindowId,
+            ),
+          )
+          .map((tab) => structuredClone(tab));
+      }),
     },
   };
 

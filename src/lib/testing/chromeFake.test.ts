@@ -72,13 +72,20 @@ describe('Chrome fake', () => {
 
   it('returns no active tab by default and can reject script injection', async () => {
     const injectionError = new Error('Injection denied');
-    const fake = createChromeFake({ executeScriptError: injectionError });
+    const emptyFake = createChromeFake();
+    const injectionFake = createChromeFake({
+      activeTab: { id: 42 },
+      executeScriptError: injectionError,
+    });
 
     await expect(
-      fake.chrome.tabs.query({ active: true, currentWindow: true }),
+      emptyFake.chrome.tabs.query({ active: true, currentWindow: true }),
     ).resolves.toEqual([]);
     await expect(
-      fake.chrome.scripting.executeScript({ target: { tabId: 42 } }),
+      injectionFake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+      }),
     ).rejects.toThrow('Injection denied');
   });
 
@@ -112,9 +119,57 @@ describe('Chrome fake', () => {
     ).resolves.toEqual([]);
   });
 
+  it('matches Chrome host wildcards and normalized URL paths', async () => {
+    const fake = createChromeFake({
+      tabs: [
+        { id: 1, url: 'https://example.com' },
+        { id: 2, url: 'https://sub.example.com/form' },
+      ],
+    });
+
+    await expect(
+      fake.chrome.tabs.query({ url: '*://*.example.com/*' }),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: 1 }),
+      expect.objectContaining({ id: 2 }),
+    ]);
+
+    const portFake = createChromeFake({
+      tabs: [{ id: 3, url: 'https://example.com:8443/admin' }],
+    });
+    await expect(
+      portFake.chrome.tabs.query({ url: 'https://example.com:8443/*' }),
+    ).resolves.toEqual([expect.objectContaining({ id: 3 })]);
+  });
+
+  it('filters explicit and last-focused windows and rejects unsupported filters', async () => {
+    const fake = createChromeFake({
+      currentWindowId: 1,
+      lastFocusedWindowId: 2,
+      tabs: [
+        { active: true, id: 1, windowId: 1 },
+        { active: true, id: 2, windowId: 2 },
+      ],
+    });
+
+    await expect(fake.chrome.tabs.query({ windowId: 2 })).resolves.toEqual([
+      expect.objectContaining({ id: 2 }),
+    ]);
+    await expect(
+      fake.chrome.tabs.query({ active: true, lastFocusedWindow: true }),
+    ).resolves.toEqual([expect.objectContaining({ id: 2 })]);
+    await expect(fake.chrome.tabs.query({ pinned: true })).rejects.toThrow(
+      'Unsupported chrome.tabs.query filter: pinned',
+    );
+  });
+
   it('returns complete, isolated tab snapshots', async () => {
     const fake = createChromeFake({
-      activeTab: { id: 42, url: 'https://example.com/form' },
+      activeTab: {
+        id: 42,
+        mutedInfo: { muted: false },
+        url: 'https://example.com/form',
+      },
     });
 
     const [firstResult] = await fake.chrome.tabs.query({ active: true });
@@ -136,10 +191,14 @@ describe('Chrome fake', () => {
 
     if (firstResult) {
       firstResult.url = 'https://mutated.example/';
+      if (firstResult.mutedInfo) {
+        firstResult.mutedInfo.muted = true;
+      }
     }
 
     const [secondResult] = await fake.chrome.tabs.query({ active: true });
     expect(secondResult?.url).toBe('https://example.com/form');
+    expect(secondResult?.mutedInfo?.muted).toBe(false);
     expect(secondResult).not.toBe(firstResult);
   });
 
@@ -151,6 +210,80 @@ describe('Chrome fake', () => {
     await expect(
       fake.chrome.scripting.executeScript({ target: {} }),
     ).rejects.toThrow('target.tabId');
+  });
+
+  it('rejects injection into missing tabs and without exactly one script source', async () => {
+    const fake = createChromeFake({
+      activeTab: { id: 42 },
+      executeScriptResult: [{ frameId: 0, result: { filled: 1 } }],
+    });
+    const func = () => undefined;
+
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 0 },
+        func,
+      }),
+    ).rejects.toThrow('No tab with id: 0');
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: -1 },
+        func,
+      }),
+    ).rejects.toThrow('No tab with id: -1');
+    await expect(
+      fake.chrome.scripting.executeScript({ target: { tabId: 42 } }),
+    ).rejects.toThrow("Exactly one of 'func' and 'files'");
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        files: ['content.js'],
+        func,
+      }),
+    ).rejects.toThrow("Exactly one of 'func' and 'files'");
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        files: ['content.js'],
+      }),
+    ).resolves.toEqual([{ frameId: 0, result: { filled: 1 } }]);
+  });
+
+  it('returns isolated script injection results', async () => {
+    const fake = createChromeFake({
+      activeTab: { id: 42 },
+      executeScriptResult: [{ frameId: 0, result: { summary: { filled: 1 } } }],
+    });
+    const injection = {
+      target: { tabId: 42 },
+      func: () => undefined,
+    };
+
+    const [firstResult] = await fake.chrome.scripting.executeScript(injection);
+    if (
+      firstResult &&
+      typeof firstResult.result === 'object' &&
+      firstResult.result !== null &&
+      'summary' in firstResult.result &&
+      typeof firstResult.result.summary === 'object' &&
+      firstResult.result.summary !== null &&
+      'filled' in firstResult.result.summary
+    ) {
+      firstResult.result.summary.filled = 99;
+    }
+
+    const [secondResult] = await fake.chrome.scripting.executeScript(injection);
+    expect(secondResult?.result).toEqual({ summary: { filled: 1 } });
+    expect(secondResult?.result).not.toBe(firstResult?.result);
+  });
+
+  it('rejects ambiguous activeTab and tabs options', () => {
+    expect(() =>
+      createChromeFake({
+        activeTab: { id: 42, windowId: 3 },
+        tabs: [{ id: 1, windowId: 3 }],
+      }),
+    ).toThrow('activeTab and tabs cannot be used together');
   });
 
   it('omits missing keys from string and array storage reads', async () => {

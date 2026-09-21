@@ -11,7 +11,9 @@ messaging と storage(local / managed / session / sync)を in-memory で再現�
 `vi.stubGlobal` でテストごとに注入できる。`activeTab`、
 `executeScriptResult`、`executeScriptError` を指定すれば、`tabs.query` と
 `scripting.executeScript` も再現できる。複数ウィンドウやクエリ条件は `tabs` と
-`currentWindowId` で設定する。
+`currentWindowId` / `lastFocusedWindowId` で設定する。対応する query 条件は
+`active`、`currentWindow`、`lastFocusedWindow`、`windowId`、`url`。未対応条件は
+黙って無視せずエラーにする。
 
 ## activeTab + scripting によるページ注入
 
