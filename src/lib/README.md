@@ -10,17 +10,20 @@ entrypoints から利用する共有モジュールの置き場です。
 messaging と storage(local / managed / session / sync)を in-memory で再現し、
 `vi.stubGlobal` でテストごとに注入できる。`activeTab`、
 `executeScriptResult`、`executeScriptError` を指定すれば、`tabs.query` と
-`scripting.executeScript` も再現できる。
+`scripting.executeScript` も再現できる。複数ウィンドウやクエリ条件は `tabs` と
+`currentWindowId` で設定する。
 
 ## activeTab + scripting によるページ注入
 
 ページに常駐する content script が不要なら、次の順序で `src/lib/` 内に注入処理を
 実装する。
 
-1. `chrome.tabs.query({ active: true, currentWindow: true })` で対象タブを取得する
-2. タブ ID の欠落と `chrome:` など注入禁止 URL を拒否する
-3. `chrome.scripting.executeScript` で対象タブへ関数を注入する
-4. 戻り値を `unknown` として型ガードで検証してから利用する
+1. `manifest.config.ts` の `permissions` に `activeTab` と `scripting` を追加し、
+   `scripts/expected-manifest.config.mjs` の期待値も同時に更新する
+2. `chrome.tabs.query({ active: true, currentWindow: true })` で対象タブを取得する
+3. タブ ID の欠落と `chrome:` など注入禁止 URL を拒否する
+4. `chrome.scripting.executeScript` で対象タブへ関数を注入する
+5. 戻り値を `unknown` として型ガードで検証してから利用する
 
 テストでは個別に Chrome API をモックせず、次のように fake の入出力だけを指定する。
 

@@ -11,10 +11,12 @@ type StorageChangeListener = (
 ) => void;
 
 type ChromeFakeOptions = {
-  activeTab?: { id?: number; url?: string };
+  activeTab?: Partial<chrome.tabs.Tab>;
+  currentWindowId?: number;
   executeScriptError?: Error;
   executeScriptResult?: ScriptInjectionResult[];
   extensionId?: string;
+  tabs?: Partial<chrome.tabs.Tab>[];
 };
 
 type ScriptInjectionResult = {
@@ -54,6 +56,82 @@ type ChromeApiFake = {
   tabs: {
     query: (queryInfo: chrome.tabs.QueryInfo) => Promise<chrome.tabs.Tab[]>;
   };
+};
+
+const createTab = (
+  tab: Partial<chrome.tabs.Tab>,
+  defaults: { active: boolean; index: number; windowId: number },
+): chrome.tabs.Tab => {
+  const active = tab.active ?? defaults.active;
+
+  return {
+    ...tab,
+    active,
+    autoDiscardable: tab.autoDiscardable ?? true,
+    discarded: tab.discarded ?? false,
+    frozen: tab.frozen ?? false,
+    groupId: tab.groupId ?? -1,
+    highlighted: tab.highlighted ?? active,
+    incognito: tab.incognito ?? false,
+    index: tab.index ?? defaults.index,
+    pinned: tab.pinned ?? false,
+    selected: tab.selected ?? active,
+    windowId: tab.windowId ?? defaults.windowId,
+  };
+};
+
+const matchesUrlPattern = (url: string, pattern: string): boolean => {
+  if (pattern === '<all_urls>') {
+    return /^(?:file|ftp|https?):/.test(url);
+  }
+
+  const escapedPattern = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replaceAll('*', '.*');
+  return new RegExp(`^${escapedPattern}$`).test(url.split('#')[0] ?? '');
+};
+
+const matchesTabQuery = (
+  tab: chrome.tabs.Tab,
+  queryInfo: chrome.tabs.QueryInfo,
+  currentWindowId: number,
+): boolean => {
+  if (queryInfo.active !== undefined && queryInfo.active !== tab.active) {
+    return false;
+  }
+
+  if (
+    queryInfo.currentWindow !== undefined &&
+    queryInfo.currentWindow !== (tab.windowId === currentWindowId)
+  ) {
+    return false;
+  }
+
+  if (queryInfo.url !== undefined) {
+    const patterns = Array.isArray(queryInfo.url)
+      ? queryInfo.url
+      : [queryInfo.url];
+    const tabUrl = tab.url;
+    if (
+      !tabUrl ||
+      !patterns.some((pattern) => matchesUrlPattern(tabUrl, pattern))
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const hasNumericTargetTabId = (injection: Record<string, unknown>): boolean => {
+  const target = injection.target;
+  return (
+    typeof target === 'object' &&
+    target !== null &&
+    'tabId' in target &&
+    typeof target.tabId === 'number' &&
+    Number.isInteger(target.tabId)
+  );
 };
 
 const getStoredValues = (
@@ -169,8 +247,22 @@ const createStorageArea = (
 export const createChromeFake = (
   options: ChromeFakeOptions = {},
 ): ChromeFake => {
-  const activeTab = options.activeTab;
+  const currentWindowId =
+    options.currentWindowId ?? options.activeTab?.windowId ?? 1;
   const extensionId = options.extensionId ?? 'test-extension-id';
+  const tabs = options.tabs
+    ? options.tabs.map((tab, index) =>
+        createTab(tab, { active: false, index, windowId: currentWindowId }),
+      )
+    : options.activeTab
+      ? [
+          createTab(options.activeTab, {
+            active: true,
+            index: 0,
+            windowId: currentWindowId,
+          }),
+        ]
+      : [];
   const runtimeListeners = new Set<RuntimeMessageListener>();
   const storageListeners = new Set<StorageChangeListener>();
   let runtimeSender: chrome.runtime.MessageSender = { id: extensionId };
@@ -228,12 +320,20 @@ export const createChromeFake = (
       ),
     },
     scripting: {
-      executeScript: vi.fn(async (_injection: Record<string, unknown>) => {
+      executeScript: vi.fn(async (injection: Record<string, unknown>) => {
+        if (!hasNumericTargetTabId(injection)) {
+          throw new TypeError(
+            'chrome.scripting.executeScript requires a numeric target.tabId.',
+          );
+        }
+
         if (options.executeScriptError) {
           throw options.executeScriptError;
         }
 
-        return options.executeScriptResult ?? [];
+        return (options.executeScriptResult ?? []).map((result) => ({
+          ...result,
+        }));
       }),
     },
     storage: {
@@ -251,8 +351,10 @@ export const createChromeFake = (
       },
     },
     tabs: {
-      query: vi.fn(async (_queryInfo: chrome.tabs.QueryInfo) =>
-        activeTab ? ([activeTab] as chrome.tabs.Tab[]) : [],
+      query: vi.fn(async (queryInfo: chrome.tabs.QueryInfo) =>
+        tabs
+          .filter((tab) => matchesTabQuery(tab, queryInfo, currentWindowId))
+          .map((tab) => ({ ...tab })),
       ),
     },
   };

@@ -82,6 +82,77 @@ describe('Chrome fake', () => {
     ).rejects.toThrow('Injection denied');
   });
 
+  it('filters tabs by active state, current window, and URL patterns', async () => {
+    const fake = createChromeFake({
+      currentWindowId: 1,
+      tabs: [
+        { active: true, id: 1, url: 'https://example.com/form', windowId: 1 },
+        { active: true, id: 2, url: 'https://other.example/form', windowId: 2 },
+      ],
+    });
+
+    await expect(
+      fake.chrome.tabs.query({ active: true }),
+    ).resolves.toHaveLength(2);
+    await expect(fake.chrome.tabs.query({ active: false })).resolves.toEqual(
+      [],
+    );
+    await expect(
+      fake.chrome.tabs.query({ active: true, currentWindow: true }),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: 1, url: 'https://example.com/form' }),
+    ]);
+    await expect(
+      fake.chrome.tabs.query({ url: 'https://example.com/*' }),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: 1, url: 'https://example.com/form' }),
+    ]);
+    await expect(
+      fake.chrome.tabs.query({ url: 'https://missing.example/*' }),
+    ).resolves.toEqual([]);
+  });
+
+  it('returns complete, isolated tab snapshots', async () => {
+    const fake = createChromeFake({
+      activeTab: { id: 42, url: 'https://example.com/form' },
+    });
+
+    const [firstResult] = await fake.chrome.tabs.query({ active: true });
+    expect(firstResult).toEqual(
+      expect.objectContaining({
+        active: true,
+        autoDiscardable: true,
+        discarded: false,
+        frozen: false,
+        groupId: -1,
+        highlighted: true,
+        incognito: false,
+        index: 0,
+        pinned: false,
+        selected: true,
+        windowId: 1,
+      }),
+    );
+
+    if (firstResult) {
+      firstResult.url = 'https://mutated.example/';
+    }
+
+    const [secondResult] = await fake.chrome.tabs.query({ active: true });
+    expect(secondResult?.url).toBe('https://example.com/form');
+    expect(secondResult).not.toBe(firstResult);
+  });
+
+  it('rejects script injection without a numeric target tab ID', async () => {
+    const fake = createChromeFake({
+      executeScriptResult: [{ frameId: 0, result: { filled: 1 } }],
+    });
+
+    await expect(
+      fake.chrome.scripting.executeScript({ target: {} }),
+    ).rejects.toThrow('target.tabId');
+  });
+
   it('omits missing keys from string and array storage reads', async () => {
     const fake = createChromeFake();
     await fake.chrome.storage.local.set({ present: 'value' });
