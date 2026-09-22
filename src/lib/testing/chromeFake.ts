@@ -247,17 +247,25 @@ const getTargetTabId = (injection: Record<string, unknown>): number => {
 
 const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
   const hasFunc = typeof injection.func === 'function';
-  const hasFiles =
-    Array.isArray(injection.files) &&
-    injection.files.length > 0 &&
-    injection.files.every((file) => typeof file === 'string');
-
-  if (injection.args !== undefined && !hasFunc) {
-    throw new TypeError("Cannot specify 'args' without 'func'.");
-  }
+  const files = injection.files;
+  const hasFiles = Array.isArray(files) && files.length > 0;
 
   if (hasFunc === hasFiles) {
     throw new TypeError('Exactly one of files and func must be specified.');
+  }
+
+  if (
+    Array.isArray(files) &&
+    files.length > 0 &&
+    !files.every((file: unknown) => typeof file === 'string')
+  ) {
+    throw new TypeError(
+      'chrome.scripting.executeScript files must contain only strings.',
+    );
+  }
+
+  if (injection.args !== undefined && !hasFunc) {
+    throw new TypeError("Cannot specify 'args' without 'func'.");
   }
 };
 
@@ -514,12 +522,12 @@ export const createChromeFake = (
       executeScript: vi.fn(async (injection: Record<string, unknown>) => {
         assertSingleScriptSource(injection);
         const tabId = getTargetTabId(injection);
-        if (!tabs.some((tab) => tab.id === tabId)) {
-          throw new Error(`No tab with id: ${tabId}.`);
-        }
-
         if (options.executeScriptError) {
           throw options.executeScriptError;
+        }
+
+        if (!tabs.some((tab) => tab.id === tabId)) {
+          throw new Error(`No tab with id: ${tabId}.`);
         }
 
         return structuredClone(options.executeScriptResult ?? []);
@@ -550,6 +558,10 @@ export const createChromeFake = (
               currentWindowId,
               lastFocusedWindowId,
             ),
+          )
+          .sort(
+            (left, right) =>
+              left.windowId - right.windowId || left.index - right.index,
           )
           .map((tab) => structuredClone(tab));
       }),

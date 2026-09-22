@@ -81,7 +81,6 @@ describe('Chrome fake', () => {
     const injectionError = new Error('Injection denied');
     const emptyFake = createChromeFake();
     const injectionFake = createChromeFake({
-      activeTab: { id: 42 },
       executeScriptError: injectionError,
     });
 
@@ -94,6 +93,25 @@ describe('Chrome fake', () => {
         func: () => undefined,
       }),
     ).rejects.toThrow('Injection denied');
+  });
+
+  it('returns tabs in window and tab-strip order', async () => {
+    const fake = createChromeFake({
+      currentWindowId: 1,
+      tabs: [
+        { id: 1, index: 1, windowId: 2 },
+        { id: 2, index: 1, windowId: 1 },
+        { id: 3, index: 0, windowId: 2 },
+        { id: 4, index: 0, windowId: 1 },
+      ],
+    });
+
+    await expect(fake.chrome.tabs.query({})).resolves.toEqual([
+      expect.objectContaining({ id: 4, index: 0, windowId: 1 }),
+      expect.objectContaining({ id: 2, index: 1, windowId: 1 }),
+      expect.objectContaining({ id: 3, index: 0, windowId: 2 }),
+      expect.objectContaining({ id: 1, index: 1, windowId: 2 }),
+    ]);
   });
 
   it('filters tabs by active state, current window, and URL patterns', async () => {
@@ -386,6 +404,36 @@ describe('Chrome fake', () => {
         files: ['content.js'],
       }),
     ).resolves.toEqual([{ frameId: 0, result: { filled: 1 } }]);
+  });
+
+  it('rejects malformed script files without hiding source conflicts', async () => {
+    const fake = createChromeFake({ activeTab: { id: 42 } });
+    const func = () => undefined;
+
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        files: [undefined] as unknown as string[],
+        func,
+      }),
+    ).rejects.toThrow('Exactly one of files and func must be specified.');
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        files: ['content.js', 42] as unknown as string[],
+      }),
+    ).rejects.toThrow('files must contain only strings');
+  });
+
+  it('validates script source exclusivity before args', async () => {
+    const fake = createChromeFake({ activeTab: { id: 42 } });
+
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        args: [1],
+      }),
+    ).rejects.toThrow('Exactly one of files and func must be specified.');
   });
 
   it('returns isolated script injection results', async () => {
