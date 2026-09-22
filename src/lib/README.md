@@ -13,8 +13,9 @@ messaging と storage(local / managed / session / sync)を in-memory で再現�
 `scripting.executeScript` も再現できる。複数ウィンドウやクエリ条件は `tabs` と
 `currentWindowId` / `lastFocusedWindowId` で設定する。対応する query 条件は
 `active`、`currentWindow`、`lastFocusedWindow`、`windowId`、`url`。未対応条件は
-黙って無視せずエラーにする。`tabs` が単一ウィンドウならその ID を current window
-として推論し、複数ウィンドウなら `currentWindowId` を必須とする。
+黙って無視せずエラーにする。全タブの `windowId` が同じならその ID を current
+window として推論する。`windowId` の指定有無が混在する場合や複数ウィンドウでは、
+曖昧さを避けるため `currentWindowId` を必須とする。
 
 ## activeTab + scripting によるページ注入
 
@@ -23,10 +24,13 @@ messaging と storage(local / managed / session / sync)を in-memory で再現�
 
 1. `manifest.config.ts` の `permissions` に `activeTab` と `scripting` を追加し、
    `scripts/expected-manifest.config.mjs` の期待値も同時に更新する
-2. `chrome.tabs.query({ active: true, currentWindow: true })` で対象タブを取得する
-3. タブ ID の欠落と `chrome:` など注入禁止 URL を拒否する
-4. `chrome.scripting.executeScript` で対象タブへ関数を注入する
-5. 戻り値を `unknown` として型ガードで検証してから利用する
+2. `activeTab` の一時的な host 権限を得るため、action の `onClicked`、command、
+   context menu などユーザー操作を起点に処理を呼び出す
+3. `chrome.tabs.query({ active: true, currentWindow: true })` で対象タブを取得する
+4. タブ ID の欠落、権限不足で `url` が `undefined` の場合、`chrome:` など注入禁止
+   URL を拒否する
+5. `chrome.scripting.executeScript` で対象タブへ関数を注入する
+6. 戻り値を `unknown` として型ガードで検証してから利用する
 
 テストでは個別に Chrome API をモックせず、次のように fake の入出力だけを指定する。
 
@@ -37,7 +41,7 @@ installChromeFake({
 });
 ```
 
-成功、注入禁止 URL、不正な戻り値のサンプルは
+成功、権限不足で URL が伏字化された場合、注入禁止 URL、不正な戻り値のサンプルは
 `src/lib/testing/chromeFake.test.ts` を参照する。
 
 ## messaging(`src/lib/messaging/`)

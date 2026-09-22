@@ -98,9 +98,8 @@ const parseUrlPattern = (pattern: string): ParsedUrlPattern => {
     return { allUrls: true };
   }
 
-  const patternParts = /^(http|https|file|\*):\/\/([^/:]*)(\/.*)$/.exec(
-    pattern,
-  );
+  const patternParts =
+    /^(http|https|file|chrome-extension|\*):\/\/([^/:]*)(\/.*)$/.exec(pattern);
   if (!patternParts) {
     throw new TypeError(`Invalid Chrome match pattern: ${pattern}`);
   }
@@ -119,7 +118,12 @@ const parseUrlPattern = (pattern: string): ParsedUrlPattern => {
 
 const matchesUrlPattern = (url: string, pattern: string): boolean => {
   const parsedPattern = parseUrlPattern(pattern);
-  const parsedUrl = new URL(url);
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return false;
+  }
 
   if (parsedPattern.allUrls) {
     return ['file:', 'http:', 'https:'].includes(parsedUrl.protocol);
@@ -257,6 +261,27 @@ const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
   }
 };
 
+const assertValidTabIndexes = (tabs: chrome.tabs.Tab[]): void => {
+  const usedIndexesByWindow = new Map<number, Set<number>>();
+
+  for (const tab of tabs) {
+    if (!Number.isInteger(tab.index) || tab.index < 0) {
+      throw new TypeError(
+        `Invalid tab index ${tab.index} in window ${tab.windowId}.`,
+      );
+    }
+
+    const usedIndexes = usedIndexesByWindow.get(tab.windowId) ?? new Set();
+    if (usedIndexes.has(tab.index)) {
+      throw new TypeError(
+        `Duplicate tab index ${tab.index} in window ${tab.windowId}.`,
+      );
+    }
+    usedIndexes.add(tab.index);
+    usedIndexesByWindow.set(tab.windowId, usedIndexes);
+  }
+};
+
 const getStoredValues = (
   store: Map<string, unknown>,
   keys?: string | string[] | Record<string, unknown> | null,
@@ -379,6 +404,9 @@ export const createChromeFake = (
       .map((tab) => tab.windowId)
       .filter((windowId): windowId is number => windowId !== undefined),
   );
+  const hasImplicitWindowId = (options.tabs ?? []).some(
+    (tab) => tab.windowId === undefined,
+  );
   if (
     options.tabs &&
     options.currentWindowId === undefined &&
@@ -387,6 +415,14 @@ export const createChromeFake = (
     throw new TypeError(
       'currentWindowId is required for multiple windows in tabs.',
     );
+  }
+  if (
+    options.tabs &&
+    options.currentWindowId === undefined &&
+    configuredWindowIds.size === 1 &&
+    hasImplicitWindowId
+  ) {
+    throw new TypeError('currentWindowId is required for mixed windowId tabs.');
   }
   const soleConfiguredWindowId =
     configuredWindowIds.size === 1
@@ -417,6 +453,7 @@ export const createChromeFake = (
           }),
         ]
       : [];
+  assertValidTabIndexes(tabs);
   const runtimeListeners = new Set<RuntimeMessageListener>();
   const storageListeners = new Set<StorageChangeListener>();
   let runtimeSender: chrome.runtime.MessageSender = { id: extensionId };
