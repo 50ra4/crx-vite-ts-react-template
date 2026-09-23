@@ -66,7 +66,8 @@ messaging レイヤー。依存ゼロの自前実装。
    export const messages = {
      greet: defineMessage(
        (v): v is { text: string } => isRecord(v) && typeof v.text === 'string',
-       (v): v is { reply: string } => isRecord(v) && typeof v.reply === 'string',
+       (v): v is { reply: string } =>
+         isRecord(v) && typeof v.reply === 'string',
      ),
    } as const;
    ```
@@ -80,7 +81,9 @@ messaging レイヤー。依存ゼロの自前実装。
 3. 受信側(background)は `addMessageListeners`。検証済みの型付き payload を受け取る:
 
    ```ts
-   addMessageListeners({ greet: (payload) => ({ reply: `Hello, ${payload.text}!` }) });
+   addMessageListeners({
+     greet: (payload) => ({ reply: `Hello, ${payload.text}!` }),
+   });
    ```
 
 `sender.id !== chrome.runtime.id` の発信・未知メッセージ・payload ガード不合格は
