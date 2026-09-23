@@ -18,6 +18,10 @@ Vitest + jsdom (`src/**/*.test.{ts,tsx}`), Vitest + Node
 - Tests that use Chrome APIs must call `installChromeFake` from
   `src/lib/testing/chromeFake.ts`. Do not duplicate runtime messaging or storage
   mocks in individual test files.
+- When changing `chromeFake` fixture validation or injection error precedence,
+  keep regression tests for previously supported fixture modes and failure paths.
+  In particular, preserve `executeScriptError`-only behavior while checking tab
+  existence whenever `activeTab` or `tabs` is supplied.
 - Because `installChromeFake` injects the global with `vi.stubGlobal`, call
   `vi.unstubAllGlobals()` in `afterEach`.
 - E2E tests run against the built extension with `npm run e2e`; use
