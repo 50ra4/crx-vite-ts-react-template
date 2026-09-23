@@ -8,20 +8,24 @@ entrypoints から利用する共有モジュールの置き場です。
 
 テストでは `src/lib/testing/chromeFake.ts` の `installChromeFake` を使う。runtime
 messaging と storage(local / managed / session / sync)を in-memory で再現し、
-`vi.stubGlobal` でテストごとに注入できる。`activeTab`、
-`executeScriptResult`、`executeScriptError` を指定すれば、`tabs.query` と
-`scripting.executeScript` も再現できる。複数ウィンドウやクエリ条件は `tabs` と
+`vi.stubGlobal` でテストごとに注入できる。`activeTab` または `tabs` で対象タブを
+設定し、`executeScriptResult` または `executeScriptError` で注入結果を再現できる。
+複数ウィンドウやクエリ条件は `tabs` と
 `currentWindowId` / `lastFocusedWindowId` で設定する。対応する query 条件は
 `active`、`currentWindow`、`lastFocusedWindow`、`windowId`、`url`。未対応条件は
 黙って無視せずエラーにする。全タブの `windowId` が同じならその ID を current
 window として推論する。`windowId` の指定有無が混在する場合や複数ウィンドウでは、
 曖昧さを避けるため `currentWindowId` を必須とする。
-タブの `id` は全ウィンドウで一意、`active: true` はウィンドウごとに最大1件とする。
+タブの `id` は全ウィンドウで一意、タブのあるウィンドウには `active: true` を
+ちょうど1件指定する。
 明示した `index` を先に確保し、省略したタブには各ウィンドウの空き番号を小さい順に
 割り当てる。各ウィンドウの `index` は `0` からの連番でなければならない。
 `executeScriptError` だけを指定した場合は従来どおり任意のタブIDで注入失敗を再現する。
-`activeTab` または `tabs`（空配列を含む）も指定した場合は、対象タブの存在を確認してから
-設定した注入エラーを返す。
+`executeScriptResult` だけの指定は許可せず、`activeTab` または `tabs` が必要。
+タブを指定した場合は、対象タブの存在を確認してから注入結果またはエラーを返す。
+注入結果はシリアライズ可能なデータに限り、fixture作成時に検証する。
+返却時は毎回コピーするため、型ガードの不正値テストには文字列や不正な形の
+オブジェクトなどを使う。
 
 ## activeTab + scripting によるページ注入
 

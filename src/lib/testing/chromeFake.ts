@@ -14,7 +14,7 @@ type ChromeFakeOptions = {
   activeTab?: Partial<chrome.tabs.Tab>;
   currentWindowId?: number;
   executeScriptError?: Error;
-  executeScriptResult?: ScriptInjectionResult[];
+  executeScriptResult?: ScriptInjectionFixtureResult[];
   extensionId?: string;
   lastFocusedWindowId?: number;
   tabs?: Partial<chrome.tabs.Tab>[];
@@ -23,6 +23,19 @@ type ChromeFakeOptions = {
 type ScriptInjectionResult = {
   frameId: number;
   result?: unknown;
+};
+
+type SerializableResult =
+  | null
+  | string
+  | number
+  | boolean
+  | SerializableResult[]
+  | { [key: string]: SerializableResult };
+
+type ScriptInjectionFixtureResult = {
+  frameId: number;
+  result?: SerializableResult;
 };
 
 export type ChromeFake = {
@@ -79,6 +92,59 @@ const createTab = (
     selected: tab.selected ?? active,
     windowId: tab.windowId ?? defaults.windowId,
   };
+};
+
+const isSerializableResult = (
+  value: unknown,
+  ancestors = new Set<object>(),
+): value is SerializableResult => {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean'
+  ) {
+    return true;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value);
+  }
+  if (typeof value !== 'object' || ancestors.has(value)) {
+    return false;
+  }
+
+  if (
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) !== Object.prototype &&
+    Object.getPrototypeOf(value) !== null
+  ) {
+    return false;
+  }
+
+  ancestors.add(value);
+  try {
+    return Object.values(value).every((item) =>
+      isSerializableResult(item, ancestors),
+    );
+  } finally {
+    ancestors.delete(value);
+  }
+};
+
+const cloneInjectionFixture = (
+  results: ScriptInjectionFixtureResult[],
+): ScriptInjectionFixtureResult[] => {
+  try {
+    if (
+      !results.every(
+        ({ result }) => result === undefined || isSerializableResult(result),
+      )
+    ) {
+      throw new TypeError();
+    }
+    return structuredClone(results);
+  } catch {
+    throw new TypeError('executeScriptResult must contain serializable data.');
+  }
 };
 
 const escapeRegularExpression = (value: string): string =>
@@ -351,6 +417,10 @@ const assertValidTabFixtures = (tabs: chrome.tabs.Tab[]): void => {
   }
 
   for (const [windowId, usedIndexes] of usedIndexesByWindow) {
+    if (!activeWindowIds.has(windowId)) {
+      throw new TypeError(`No active tab in window ${windowId}.`);
+    }
+
     for (let index = 0; index < usedIndexes.size; index += 1) {
       if (!usedIndexes.has(index)) {
         throw new TypeError(
@@ -478,6 +548,16 @@ export const createChromeFake = (
     throw new TypeError('activeTab and tabs cannot be used together.');
   }
 
+  const hasTabFixture =
+    options.activeTab !== undefined || options.tabs !== undefined;
+  if (options.executeScriptResult !== undefined && !hasTabFixture) {
+    throw new TypeError('executeScriptResult requires activeTab or tabs.');
+  }
+  const scriptResults =
+    options.executeScriptResult === undefined
+      ? undefined
+      : cloneInjectionFixture(options.executeScriptResult);
+
   const configuredWindowIds = new Set(
     (options.tabs ?? [])
       .map((tab) => tab.windowId)
@@ -586,10 +666,10 @@ export const createChromeFake = (
       executeScript: vi.fn(async (injection: Record<string, unknown>) => {
         assertSingleScriptSource(injection);
         const tabId = getTargetTabId(injection);
-        if (
-          (options.tabs !== undefined || options.activeTab !== undefined) &&
-          !tabs.some((tab) => tab.id === tabId)
-        ) {
+        if (options.executeScriptError && !hasTabFixture) {
+          throw options.executeScriptError;
+        }
+        if (!tabs.some((tab) => tab.id === tabId)) {
           throw new Error(`No tab with id: ${tabId}.`);
         }
 
@@ -597,11 +677,7 @@ export const createChromeFake = (
           throw options.executeScriptError;
         }
 
-        if (!tabs.some((tab) => tab.id === tabId)) {
-          throw new Error(`No tab with id: ${tabId}.`);
-        }
-
-        return structuredClone(options.executeScriptResult ?? []);
+        return structuredClone(scriptResults ?? []);
       }),
     },
     storage: {

@@ -95,14 +95,22 @@ describe('Chrome fake', () => {
     ).rejects.toThrow('Injection denied');
   });
 
+  it('requires a tab fixture for configured injection results', () => {
+    expect(() =>
+      createChromeFake({
+        executeScriptResult: [{ frameId: 0, result: { filled: 1 } }],
+      }),
+    ).toThrow('executeScriptResult requires activeTab or tabs');
+  });
+
   it('returns tabs in window and tab-strip order', async () => {
     const fake = createChromeFake({
       currentWindowId: 1,
       tabs: [
         { id: 1, index: 1, windowId: 2 },
         { id: 2, index: 1, windowId: 1 },
-        { id: 3, index: 0, windowId: 2 },
-        { id: 4, index: 0, windowId: 1 },
+        { active: true, id: 3, index: 0, windowId: 2 },
+        { active: true, id: 4, index: 0, windowId: 1 },
       ],
     });
 
@@ -147,7 +155,7 @@ describe('Chrome fake', () => {
   it('matches Chrome host wildcards and normalized URL paths', async () => {
     const fake = createChromeFake({
       tabs: [
-        { id: 1, url: 'https://example.com' },
+        { active: true, id: 1, url: 'https://example.com' },
         { id: 2, url: 'https://sub.example.com/form' },
       ],
     });
@@ -160,7 +168,7 @@ describe('Chrome fake', () => {
     ]);
 
     const portFake = createChromeFake({
-      tabs: [{ id: 3, url: 'https://example.com:8443/admin' }],
+      tabs: [{ active: true, id: 3, url: 'https://example.com:8443/admin' }],
     });
     await expect(
       portFake.chrome.tabs.query({ url: 'https://example.com/*' }),
@@ -170,7 +178,9 @@ describe('Chrome fake', () => {
     ).rejects.toThrow('Invalid Chrome match pattern');
 
     const extensionFake = createChromeFake({
-      tabs: [{ id: 4, url: 'chrome-extension://abcdef/options.html' }],
+      tabs: [
+        { active: true, id: 4, url: 'chrome-extension://abcdef/options.html' },
+      ],
     });
     await expect(
       extensionFake.chrome.tabs.query({
@@ -183,7 +193,7 @@ describe('Chrome fake', () => {
     const fake = createChromeFake({
       tabs: [
         { id: 1, url: 'example.com/form' },
-        { id: 2, url: 'https://ok.example/' },
+        { active: true, id: 2, url: 'https://ok.example/' },
       ],
     });
 
@@ -297,8 +307,8 @@ describe('Chrome fake', () => {
     const multipleWindowsFake = createChromeFake({
       currentWindowId: 1,
       tabs: [
-        { id: 1, windowId: 1 },
-        { id: 2, windowId: 2 },
+        { active: true, id: 1, windowId: 1 },
+        { active: true, id: 2, windowId: 2 },
         { id: 3, windowId: 2 },
       ],
     });
@@ -309,7 +319,10 @@ describe('Chrome fake', () => {
     ]);
 
     const explicitIndexFake = createChromeFake({
-      tabs: [{ id: 1, index: 1 }, { id: 2 }],
+      tabs: [
+        { id: 1, index: 1 },
+        { active: true, id: 2 },
+      ],
     });
     await expect(explicitIndexFake.chrome.tabs.query({})).resolves.toEqual([
       expect.objectContaining({ id: 2, index: 0 }),
@@ -317,7 +330,7 @@ describe('Chrome fake', () => {
     ]);
 
     const laterExplicitIndexFake = createChromeFake({
-      tabs: [{ id: 1 }, { id: 2, index: 0 }],
+      tabs: [{ id: 1 }, { active: true, id: 2, index: 0 }],
     });
     await expect(laterExplicitIndexFake.chrome.tabs.query({})).resolves.toEqual(
       [
@@ -363,7 +376,9 @@ describe('Chrome fake', () => {
 
   it('rejects gaps in indexes within a window', () => {
     expect(() =>
-      createChromeFake({ tabs: [{ id: 1, index: 3 }, { id: 2 }] }),
+      createChromeFake({
+        tabs: [{ active: true, id: 1, index: 3 }, { id: 2 }],
+      }),
     ).toThrow('Tab indexes must be contiguous in window 1');
   });
 
@@ -376,6 +391,22 @@ describe('Chrome fake', () => {
         ],
       }),
     ).toThrow('Multiple active tabs in window 1');
+  });
+
+  it('rejects nonempty windows without an active tab', () => {
+    expect(() => createChromeFake({ tabs: [{ id: 1 }] })).toThrow(
+      'No active tab in window 1',
+    );
+    expect(() =>
+      createChromeFake({
+        currentWindowId: 1,
+        tabs: [
+          { active: true, id: 1, windowId: 1 },
+          { id: 2, windowId: 2 },
+        ],
+      }),
+    ).toThrow('No active tab in window 2');
+    expect(() => createChromeFake({ tabs: [] })).not.toThrow();
   });
 
   it('rejects duplicate tab IDs across windows', () => {
@@ -392,6 +423,7 @@ describe('Chrome fake', () => {
 
   it('rejects script injection without a numeric target tab ID', async () => {
     const fake = createChromeFake({
+      activeTab: { id: 42 },
       executeScriptResult: [{ frameId: 0, result: { filled: 1 } }],
     });
 
@@ -461,7 +493,7 @@ describe('Chrome fake', () => {
       executeScriptError: denied,
     });
     const listedTabsFake = createChromeFake({
-      tabs: [{ id: 42 }],
+      tabs: [{ active: true, id: 42 }],
       executeScriptError: denied,
     });
     const injection = (tabId: number) => ({
@@ -560,6 +592,21 @@ describe('Chrome fake', () => {
     const [secondResult] = await fake.chrome.scripting.executeScript(injection);
     expect(secondResult?.result).toEqual({ summary: { filled: 1 } });
     expect(secondResult?.result).not.toBe(firstResult?.result);
+  });
+
+  it('rejects non-serializable injection results at fixture creation', () => {
+    expect(() =>
+      createChromeFake({
+        activeTab: { id: 42 },
+        executeScriptResult: [
+          {
+            frameId: 0,
+            // @ts-expect-error functions cannot be serialized as injection results
+            result: () => 1,
+          },
+        ],
+      }),
+    ).toThrow('executeScriptResult must contain serializable data');
   });
 
   it('rejects ambiguous activeTab and tabs options', () => {
