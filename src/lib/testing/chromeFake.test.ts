@@ -312,9 +312,19 @@ describe('Chrome fake', () => {
       tabs: [{ id: 1, index: 1 }, { id: 2 }],
     });
     await expect(explicitIndexFake.chrome.tabs.query({})).resolves.toEqual([
+      expect.objectContaining({ id: 2, index: 0 }),
       expect.objectContaining({ id: 1, index: 1 }),
-      expect.objectContaining({ id: 2, index: 2 }),
     ]);
+
+    const laterExplicitIndexFake = createChromeFake({
+      tabs: [{ id: 1 }, { id: 2, index: 0 }],
+    });
+    await expect(laterExplicitIndexFake.chrome.tabs.query({})).resolves.toEqual(
+      [
+        expect.objectContaining({ id: 2, index: 0 }),
+        expect.objectContaining({ id: 1, index: 1 }),
+      ],
+    );
   });
 
   it('requires currentWindowId for tabs spanning multiple windows', () => {
@@ -339,11 +349,45 @@ describe('Chrome fake', () => {
 
   it('rejects duplicate and negative tab indexes', () => {
     expect(() =>
-      createChromeFake({ tabs: [{ id: 1 }, { id: 2, index: 0 }] }),
+      createChromeFake({
+        tabs: [
+          { id: 1, index: 0 },
+          { id: 2, index: 0 },
+        ],
+      }),
     ).toThrow('Duplicate tab index 0 in window 1');
     expect(() => createChromeFake({ tabs: [{ id: 1, index: -5 }] })).toThrow(
       'Invalid tab index -5 in window 1',
     );
+  });
+
+  it('rejects gaps in indexes within a window', () => {
+    expect(() =>
+      createChromeFake({ tabs: [{ id: 1, index: 3 }, { id: 2 }] }),
+    ).toThrow('Tab indexes must be contiguous in window 1');
+  });
+
+  it('rejects multiple active tabs in the same window', () => {
+    expect(() =>
+      createChromeFake({
+        tabs: [
+          { active: true, id: 1 },
+          { active: true, id: 2 },
+        ],
+      }),
+    ).toThrow('Multiple active tabs in window 1');
+  });
+
+  it('rejects duplicate tab IDs across windows', () => {
+    expect(() =>
+      createChromeFake({
+        currentWindowId: 1,
+        tabs: [
+          { id: 7, windowId: 1 },
+          { id: 7, windowId: 2 },
+        ],
+      }),
+    ).toThrow('Duplicate tab id 7');
   });
 
   it('rejects script injection without a numeric target tab ID', async () => {
@@ -406,6 +450,42 @@ describe('Chrome fake', () => {
     ).resolves.toEqual([{ frameId: 0, result: { filled: 1 } }]);
   });
 
+  it('checks explicit tab fixtures before returning a configured injection error', async () => {
+    const denied = new Error('Injection denied');
+    const activeTabFake = createChromeFake({
+      activeTab: { id: 42 },
+      executeScriptError: denied,
+    });
+    const emptyTabsFake = createChromeFake({
+      tabs: [],
+      executeScriptError: denied,
+    });
+    const listedTabsFake = createChromeFake({
+      tabs: [{ id: 42 }],
+      executeScriptError: denied,
+    });
+    const injection = (tabId: number) => ({
+      target: { tabId },
+      func: () => undefined,
+    });
+
+    await expect(
+      activeTabFake.chrome.scripting.executeScript(injection(999)),
+    ).rejects.toThrow('No tab with id: 999');
+    await expect(
+      activeTabFake.chrome.scripting.executeScript(injection(42)),
+    ).rejects.toThrow('Injection denied');
+    await expect(
+      emptyTabsFake.chrome.scripting.executeScript(injection(42)),
+    ).rejects.toThrow('No tab with id: 42');
+    await expect(
+      listedTabsFake.chrome.scripting.executeScript(injection(999)),
+    ).rejects.toThrow('No tab with id: 999');
+    await expect(
+      listedTabsFake.chrome.scripting.executeScript(injection(42)),
+    ).rejects.toThrow('Injection denied');
+  });
+
   it('rejects malformed script files without hiding source conflicts', async () => {
     const fake = createChromeFake({ activeTab: { id: 42 } });
     const func = () => undefined;
@@ -423,6 +503,24 @@ describe('Chrome fake', () => {
         files: ['content.js', 42] as unknown as string[],
       }),
     ).rejects.toThrow('files must contain only strings');
+  });
+
+  it('treats an empty files array as specified and rejects it', async () => {
+    const fake = createChromeFake({ activeTab: { id: 42 } });
+
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+        files: [],
+      }),
+    ).rejects.toThrow('Exactly one of files and func must be specified.');
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        files: [],
+      }),
+    ).rejects.toThrow('At least one file must be specified.');
   });
 
   it('validates script source exclusivity before args', async () => {

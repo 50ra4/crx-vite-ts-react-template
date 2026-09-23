@@ -248,10 +248,14 @@ const getTargetTabId = (injection: Record<string, unknown>): number => {
 const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
   const hasFunc = typeof injection.func === 'function';
   const files = injection.files;
-  const hasFiles = Array.isArray(files) && files.length > 0;
+  const hasFiles = Array.isArray(files);
 
   if (hasFunc === hasFiles) {
     throw new TypeError('Exactly one of files and func must be specified.');
+  }
+
+  if (hasFiles && files.length === 0) {
+    throw new TypeError('At least one file must be specified.');
   }
 
   if (
@@ -269,10 +273,67 @@ const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
   }
 };
 
-const assertValidTabIndexes = (tabs: chrome.tabs.Tab[]): void => {
+const createTabs = (
+  configuredTabs: Partial<chrome.tabs.Tab>[],
+  currentWindowId: number,
+): chrome.tabs.Tab[] => {
+  const reservedIndexesByWindow = new Map<number, Set<number>>();
+
+  for (const tab of configuredTabs) {
+    if (tab.index === undefined) {
+      continue;
+    }
+
+    const windowId = tab.windowId ?? currentWindowId;
+    const reservedIndexes = reservedIndexesByWindow.get(windowId) ?? new Set();
+    if (reservedIndexes.has(tab.index)) {
+      throw new TypeError(
+        `Duplicate tab index ${tab.index} in window ${windowId}.`,
+      );
+    }
+    reservedIndexes.add(tab.index);
+    reservedIndexesByWindow.set(windowId, reservedIndexes);
+  }
+
+  const nextIndexByWindow = new Map<number, number>();
+  return configuredTabs.map((tab) => {
+    const windowId = tab.windowId ?? currentWindowId;
+    const reservedIndexes = reservedIndexesByWindow.get(windowId) ?? new Set();
+    let index = tab.index;
+    if (index === undefined) {
+      index = nextIndexByWindow.get(windowId) ?? 0;
+      while (reservedIndexes.has(index)) {
+        index += 1;
+      }
+      reservedIndexes.add(index);
+      nextIndexByWindow.set(windowId, index + 1);
+      reservedIndexesByWindow.set(windowId, reservedIndexes);
+    }
+
+    return createTab(tab, { active: false, index, windowId });
+  });
+};
+
+const assertValidTabFixtures = (tabs: chrome.tabs.Tab[]): void => {
   const usedIndexesByWindow = new Map<number, Set<number>>();
+  const activeWindowIds = new Set<number>();
+  const tabIds = new Set<number>();
 
   for (const tab of tabs) {
+    if (tab.id !== undefined) {
+      if (tabIds.has(tab.id)) {
+        throw new TypeError(`Duplicate tab id ${tab.id}.`);
+      }
+      tabIds.add(tab.id);
+    }
+
+    if (tab.active) {
+      if (activeWindowIds.has(tab.windowId)) {
+        throw new TypeError(`Multiple active tabs in window ${tab.windowId}.`);
+      }
+      activeWindowIds.add(tab.windowId);
+    }
+
     if (!Number.isInteger(tab.index) || tab.index < 0) {
       throw new TypeError(
         `Invalid tab index ${tab.index} in window ${tab.windowId}.`,
@@ -287,6 +348,16 @@ const assertValidTabIndexes = (tabs: chrome.tabs.Tab[]): void => {
     }
     usedIndexes.add(tab.index);
     usedIndexesByWindow.set(tab.windowId, usedIndexes);
+  }
+
+  for (const [windowId, usedIndexes] of usedIndexesByWindow) {
+    for (let index = 0; index < usedIndexes.size; index += 1) {
+      if (!usedIndexes.has(index)) {
+        throw new TypeError(
+          `Tab indexes must be contiguous in window ${windowId}.`,
+        );
+      }
+    }
   }
 };
 
@@ -443,15 +514,8 @@ export const createChromeFake = (
     1;
   const lastFocusedWindowId = options.lastFocusedWindowId ?? currentWindowId;
   const extensionId = options.extensionId ?? 'test-extension-id';
-  const tabIndexesByWindow = new Map<number, number>();
   const tabs = options.tabs
-    ? options.tabs.map((tab) => {
-        const windowId = tab.windowId ?? currentWindowId;
-        const index = tabIndexesByWindow.get(windowId) ?? 0;
-        const createdTab = createTab(tab, { active: false, index, windowId });
-        tabIndexesByWindow.set(windowId, Math.max(index, createdTab.index + 1));
-        return createdTab;
-      })
+    ? createTabs(options.tabs, currentWindowId)
     : options.activeTab
       ? [
           createTab(options.activeTab, {
@@ -461,7 +525,7 @@ export const createChromeFake = (
           }),
         ]
       : [];
-  assertValidTabIndexes(tabs);
+  assertValidTabFixtures(tabs);
   const runtimeListeners = new Set<RuntimeMessageListener>();
   const storageListeners = new Set<StorageChangeListener>();
   let runtimeSender: chrome.runtime.MessageSender = { id: extensionId };
@@ -522,6 +586,13 @@ export const createChromeFake = (
       executeScript: vi.fn(async (injection: Record<string, unknown>) => {
         assertSingleScriptSource(injection);
         const tabId = getTargetTabId(injection);
+        if (
+          (options.tabs !== undefined || options.activeTab !== undefined) &&
+          !tabs.some((tab) => tab.id === tabId)
+        ) {
+          throw new Error(`No tab with id: ${tabId}.`);
+        }
+
         if (options.executeScriptError) {
           throw options.executeScriptError;
         }

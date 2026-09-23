@@ -16,6 +16,12 @@ messaging と storage(local / managed / session / sync)を in-memory で再現�
 黙って無視せずエラーにする。全タブの `windowId` が同じならその ID を current
 window として推論する。`windowId` の指定有無が混在する場合や複数ウィンドウでは、
 曖昧さを避けるため `currentWindowId` を必須とする。
+タブの `id` は全ウィンドウで一意、`active: true` はウィンドウごとに最大1件とする。
+明示した `index` を先に確保し、省略したタブには各ウィンドウの空き番号を小さい順に
+割り当てる。各ウィンドウの `index` は `0` からの連番でなければならない。
+`executeScriptError` だけを指定した場合は従来どおり任意のタブIDで注入失敗を再現する。
+`activeTab` または `tabs`（空配列を含む）も指定した場合は、対象タブの存在を確認してから
+設定した注入エラーを返す。
 
 ## activeTab + scripting によるページ注入
 
