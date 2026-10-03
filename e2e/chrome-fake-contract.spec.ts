@@ -20,6 +20,13 @@ test.use({
   },
 });
 
+test.afterEach(async ({ extensionPage, extensionId }) => {
+  // The oracle must work even when every product HTML surface is removed.
+  expect(extensionPage.url()).toBe(
+    `chrome-extension://${extensionId}/manifest.json`,
+  );
+});
+
 const createTargetTab = async (
   context: BrowserContext,
   extensionPage: Page,
@@ -50,7 +57,7 @@ test('checks fake URL expectations against real Chromium tabs.query', async ({
   extensionPage,
   extensionId,
 }) => {
-  await extensionPage.goto(`chrome-extension://${extensionId}/popup.html`);
+  await extensionPage.goto(`chrome-extension://${extensionId}/manifest.json`);
   const { page: targetPage, tabId } = await createTargetTab(
     extensionContext,
     extensionPage,
@@ -120,7 +127,7 @@ test('documents the serialized values expected by injection result fixtures', as
   extensionPage,
   extensionId,
 }) => {
-  await extensionPage.goto(`chrome-extension://${extensionId}/popup.html`);
+  await extensionPage.goto(`chrome-extension://${extensionId}/manifest.json`);
   const { page: targetPage, tabId } = await createTargetTab(
     extensionContext,
     extensionPage,
@@ -137,7 +144,7 @@ test('documents the serialized values expected by injection result fixtures', as
     ]) {
       // oxlint-disable-next-line no-restricted-globals -- Measure serialization at the browser boundary.
       const [result] = await chrome.scripting.executeScript({
-        target: { tabId: targetTabId },
+        target: { tabId: targetTabId, allFrames: false },
         func: (value: string) => {
           if (value === 'undefined-property') return { title: undefined, a: 1 };
           if (value === 'function') return () => 1;
@@ -194,4 +201,26 @@ test('documents the serialized values expected by injection result fixtures', as
   expect(rejections[1]).toContain('unserializable');
   expect(rejections[2]).toContain("Cannot specify 'allFrames'");
   expect(rejections[3]).toContain('No frame with id 5');
+  await expect(
+    extensionPage.evaluate(async (tabId) => {
+      // oxlint-disable-next-line no-restricted-globals -- Probe invalid source types through the real API.
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['a.js'],
+        // @ts-expect-error intentionally malformed JavaScript caller
+        func: 'x',
+      });
+    }, tabId),
+  ).rejects.toThrow('expected function');
+  await expect(
+    extensionPage.evaluate(async (tabId) => {
+      // oxlint-disable-next-line no-restricted-globals -- Probe invalid source types through the real API.
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => undefined,
+        // @ts-expect-error intentionally malformed JavaScript caller
+        files: 'a.js',
+      });
+    }, tabId),
+  ).rejects.toThrow('expected array');
 });

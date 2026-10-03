@@ -111,17 +111,17 @@ export const tabUrlCases: TabUrlCase[] = [
   { url: 'about:blank', pattern: '<all_urls>', matches: true },
   { url: 'about:blank', pattern: '*://*/*', matches: false },
   {
-    url: 'chrome-extension://EXTENSION_ID/popup.html',
+    url: 'chrome-extension://EXTENSION_ID/manifest.json',
     pattern: 'chrome-extension://EXTENSION_ID/*',
     matches: true,
   },
   {
-    url: 'chrome-extension://EXTENSION_ID/popup.html',
+    url: 'chrome-extension://EXTENSION_ID/manifest.json',
     pattern: '<all_urls>',
     matches: true,
   },
   {
-    url: 'chrome-extension://EXTENSION_ID/popup.html',
+    url: 'chrome-extension://EXTENSION_ID/manifest.json',
     pattern: '*://*/*',
     matches: false,
   },
