@@ -143,6 +143,31 @@ for (const suffix of ['?', '?#fragment', '?#fragment?ignored']) {
 }
 tabUrlCases.push(
   {
+    url: 'https://example.com/docs?\\tail',
+    pattern: 'https://example.com/docs?\\tail/*',
+    matches: false,
+  },
+  {
+    url: 'https://example.com/docs?\\tail/page',
+    pattern: 'https://example.com/docs?\\tail/*',
+    matches: true,
+  },
+  {
+    url: 'https://example.com/docs?',
+    pattern: 'https://example.com/docs?/*',
+    matches: false,
+  },
+  {
+    url: 'https://example.com/docs?query',
+    pattern: 'https://example.com/docs?query/*',
+    matches: false,
+  },
+  {
+    url: 'https://example.com/docs?/page',
+    pattern: 'https://example.com/docs?/*',
+    matches: true,
+  },
+  {
     url: 'https://example.com/docs',
     pattern: 'https://example.com/docs/*',
     matches: true,

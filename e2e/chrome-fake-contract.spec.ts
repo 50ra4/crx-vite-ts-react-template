@@ -166,4 +166,32 @@ test('documents the serialized values expected by injection result fixtures', as
       hasDocumentId: true,
     })),
   );
+  const rejections = await extensionPage.evaluate(async (targetTabId) => {
+    const cases = [
+      { args: [() => 1] },
+      { args: [undefined] },
+      { target: { tabId: targetTabId, allFrames: true, frameIds: [0] } },
+      { target: { tabId: targetTabId, frameIds: [5] } },
+    ];
+    const errors = [];
+    for (const injection of cases) {
+      try {
+        // oxlint-disable-next-line no-restricted-globals -- Measure rejected injection arguments at the browser boundary.
+        await chrome.scripting.executeScript({
+          // @ts-expect-error deliberately send a conflicting target to verify runtime rejection
+          target: { tabId: targetTabId },
+          func: () => undefined,
+          ...injection,
+        });
+        errors.push('unexpected success');
+      } catch (error) {
+        errors.push(String(error));
+      }
+    }
+    return errors;
+  }, tabId);
+  expect(rejections[0]).toContain('unserializable');
+  expect(rejections[1]).toContain('unserializable');
+  expect(rejections[2]).toContain("Cannot specify 'allFrames'");
+  expect(rejections[3]).toContain('No frame with id 5');
 });

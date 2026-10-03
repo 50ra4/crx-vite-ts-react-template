@@ -53,6 +53,90 @@ const executeInActiveTab = async (): Promise<SampleInjectionResult | null> => {
 };
 
 describe('Chrome fake', () => {
+  it.each([[undefined], [() => 1], [{ nested: undefined }]])(
+    'rejects unserializable injection args %j before configured errors',
+    async (value) => {
+      for (const options of [
+        { activeTab: { id: 42 } },
+        { executeScriptError: new Error('denied') },
+      ]) {
+        const fake = createChromeFake(options);
+        await expect(
+          fake.chrome.scripting.executeScript({
+            target: { tabId: 42 },
+            func: () => undefined,
+            args: [value],
+          }),
+        ).rejects.toThrow('args must contain serializable data');
+      }
+    },
+  );
+
+  it('accepts serialized args without executing the function', async () => {
+    const fake = createChromeFake({ activeTab: { id: 42 } });
+    const func = vi.fn();
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func,
+        args: [null, 1, 'value', true, { nested: [1, null] }],
+      }),
+    ).resolves.toEqual([{ frameId: 0, result: null }]);
+    expect(func).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { frameIds: [5] },
+    { allFrames: true },
+    { allFrames: true, frameIds: [0] },
+    { documentIds: ['document'] },
+  ])(
+    'rejects unsupported injection target %j rather than returning unrelated results',
+    async (target) => {
+      const fake = createChromeFake({ activeTab: { id: 42 } });
+      await expect(
+        fake.chrome.scripting.executeScript({
+          target: { tabId: 42, ...target },
+          func: () => undefined,
+        }),
+      ).rejects.toThrow('Unsupported executeScript target');
+    },
+  );
+
+  it('captures the configured error without following later options edits', async () => {
+    const denied = new Error('denied');
+    const options: { executeScriptError?: Error } = {
+      executeScriptError: denied,
+    };
+    const fake = createChromeFake(options);
+    delete options.executeScriptError;
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+      }),
+    ).rejects.toBe(denied);
+    options.executeScriptError = new Error('replacement');
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+      }),
+    ).rejects.toBe(denied);
+    const successOptions: {
+      activeTab: { id: number };
+      executeScriptError?: Error;
+    } = { activeTab: { id: 42 } };
+    const success = createChromeFake(successOptions);
+    successOptions.executeScriptError = denied;
+    await expect(
+      success.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+      }),
+    ).resolves.toEqual([{ frameId: 0, result: null }]);
+  });
+
   it('returns an isolated main-frame null result by default, preserving explicit empty results', async () => {
     const fake = createChromeFake({ activeTab: { id: 42 } });
     const injection = { target: { tabId: 42 }, func: () => undefined };

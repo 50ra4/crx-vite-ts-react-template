@@ -28,6 +28,11 @@ window として推論する。`windowId` の指定有無が混在する場合�
 `executeScriptError` だけの指定は、エラー経路専用のfixtureモードであり、
 タブを登録せず任意の整数タブIDで設定エラーを再現できる。
 引数形式の検証は省略しない。
+`args` はシリアライズ済みデータからなる配列に限定し、関数や `undefined` などは拒否する。
+Chromeによる引数の自動変換は再現しない。`target` は `tabId` のみ対応し、
+`frameIds` / `allFrames` / `documentIds` などの追加指定は未対応として拒否する。
+設定エラーの参照は生成時に固定し、後からoptionsのプロパティを削除・差し替えても
+動作を変えない。Errorオブジェクト自体のcloneは行わない。
 `executeScriptResult` だけの指定は許可せず、`activeTab` または `tabs` に
 有効な `id` を持つタブが1件以上必要。結果を指定しない場合は、ID欠落への防御を
 検証するため `id` のないタブも許可する。

@@ -226,8 +226,10 @@ const compilePath = (
   expression: new RegExp(
     `^${escapeRegularExpression(path).replaceAll('*', '.*')}$`,
   ),
-  // Chromium's exception is literal equality, not a second wildcard match.
-  directory: path.endsWith('/*') ? path.slice(0, -2) : undefined,
+  // Chromium compares its glob-escaped path literally for this exception.
+  directory: path.endsWith('/*')
+    ? path.slice(0, -2).replaceAll('\\', '\\\\').replaceAll('?', '\\?')
+    : undefined,
 });
 
 const normalizeHost = (host: string): string => {
@@ -449,6 +451,10 @@ const getTargetTabId = (injection: Record<string, unknown>): number => {
     typeof target.tabId === 'number' &&
     Number.isInteger(target.tabId)
   ) {
+    const unsupported = Object.keys(target).find((key) => key !== 'tabId');
+    if (unsupported) {
+      throw new TypeError(`Unsupported executeScript target: ${unsupported}.`);
+    }
     return target.tabId;
   }
 
@@ -478,6 +484,12 @@ const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
 
   if (injection.args !== undefined && !hasFunc) {
     throw new TypeError("Cannot specify 'args' without 'func'.");
+  }
+  if (
+    injection.args !== undefined &&
+    (!Array.isArray(injection.args) || !isSerializableResult(injection.args))
+  ) {
+    throw new TypeError('executeScript args must contain serializable data.');
   }
 };
 
@@ -711,6 +723,7 @@ export const createChromeFake = (
 
   const hasTabFixture =
     options.activeTab !== undefined || options.tabs !== undefined;
+  const executeScriptError = options.executeScriptError;
   if (options.executeScriptResult !== undefined && !hasTabFixture) {
     throw new TypeError('executeScriptResult requires activeTab or tabs.');
   }
@@ -837,13 +850,13 @@ export const createChromeFake = (
         assertSingleScriptSource(injection);
         const tabId = getTargetTabId(injection);
         // The owner-approved error-only fixture bypasses tab existence checks.
-        const requiresTab = hasTabFixture || !options.executeScriptError;
+        const requiresTab = hasTabFixture || !executeScriptError;
         if (requiresTab && !tabs.some((tab) => tab.id === tabId)) {
           throw new Error(`No tab with id: ${tabId}.`);
         }
 
-        if (options.executeScriptError) {
-          throw options.executeScriptError;
+        if (executeScriptError) {
+          throw executeScriptError;
         }
 
         return structuredClone(scriptResults);
