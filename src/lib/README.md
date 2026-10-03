@@ -19,26 +19,37 @@ messaging と storage(local / managed / session / sync)を in-memory で再現�
 黙って無視せずエラーにする。全タブの `windowId` が同じならその ID を current
 window として推論する。`windowId` の指定有無が混在する場合や複数ウィンドウでは、
 曖昧さを避けるため `currentWindowId` を必須とする。
-タブの `id` は全ウィンドウで一意、タブのあるウィンドウには `active: true` を
+タブの `id` は全ウィンドウで一意。指定する `id` / `windowId` と
+`currentWindowId` / `lastFocusedWindowId` は0以上の整数でなければならない。
+タブのあるウィンドウには `active: true` を
 ちょうど1件指定する。
 明示した `index` を先に確保し、省略したタブには各ウィンドウの空き番号を小さい順に
 割り当てる。各ウィンドウの `index` は `0` からの連番でなければならない。
 `executeScriptError` だけの指定は、エラー経路専用のfixtureモードであり、
 タブを登録せず任意の整数タブIDで設定エラーを再現できる。
 引数形式の検証は省略しない。
-`executeScriptResult` だけの指定は許可せず、`activeTab` または1件以上の `tabs` が必要。
+`executeScriptResult` だけの指定は許可せず、`activeTab` または `tabs` に
+有効な `id` を持つタブが1件以上必要。結果を指定しない場合は、ID欠落への防御を
+検証するため `id` のないタブも許可する。
 結果を `[]` にした場合も同じで、`tabs: []` と結果の同時指定は生成時に拒否する。
 結果なしの `tabs: []` は「タブがない」分岐のテストに使える。
 タブを指定した場合は、対象タブの存在を確認してから注入結果またはエラーを返す。
+対象タブが存在し、結果・エラーを指定しない場合の既定応答は
+`[{ frameId: 0, result: null }]`。明示的な `executeScriptResult: []` は通常の成功応答
+ではなく、不完全な応答への防御を検証するために許可する。
 タブと注入結果は生成時にも返却時にもdeep cloneし、入力・呼び出し間の変更を分離する。
 
 `executeScriptResult` は **Chromeによる変換後のAPI応答** を指定するfixtureであり、
 注入関数の生の戻り値ではない。`func` の実行やChromeの直列化処理は再現しない。
-結果には `null`・文字列・有限数・真偽値・配列・plain object
+各応答の `frameId` は0以上の整数。実Chromeが返す `documentId` はfakeでは省略可能で、
+指定する場合は文字列とする。fakeによるdocument IDの自動生成は行わない。
+結果には `null`・文字列・有限数・真偽値・密な配列・plain object
 からなるデータを指定し、生成時に検証する。関数やDOMを自動変換したり、元の参照を
 そのまま返したりはしない。例えば実Chromeで `{ title: undefined, a: 1 }` を返す
 ケースは `{ a: 1 }`、関数や `undefined` を返すケースは `null`、`document.body`
-を返すケースは `{}` をfixtureに設定する。これらの変換は
+を返すケースは `{}`、疎配列 `[1, , 2]` は `[1, null, 2]` をfixtureに設定する。
+応答一覧およびネストした結果配列の穴、結果配列の追加の列挙可能プロパティ、
+循環参照や非有限数は生成時に拒否する。これらの変換は
 `e2e/chrome-fake-contract.spec.ts` で実Chromiumにも照合する。
 型ガードの不正値テストには `null`・文字列・不正な形のオブジェクトを使える。
 `result` の省略は、不完全な応答への防御を検証するために許可する。
@@ -51,6 +62,9 @@ IPv6ホストは `[...]` で指定する。schemeの `*` はhttp/httpsのみ、�
 同じschemeだけ、`<all_urls>` は `chrome:`・拡張ページ・`about:blank` も対象とする。
 非空のURL条件では、不正patternを検索前に拒否し、不正なfixture URLや未指定URLは
 非一致にする。空クエリの区切り文字 `?` は保持し、fragmentの `#` 以降は照合しない。
+末尾 `/*` にはChromiumの特例を適用し、`https://example.com/docs/*` は
+`https://example.com/docs` にも一致する。ただし `/doc/*` や `/do*s/*` を同じURLに
+一致させたり、クエリ付きの `/docs?x=1` や `/docs?` をこの特例で一致させたりはしない。
 `scheme://` 形式の対応範囲は `http` / `https` / `file` / `ftp` / `ws` / `wss` /
 `chrome` / `chrome-extension` / `chrome-search` / `chrome-native` /
 `chrome-distiller` / `chrome-untrusted` / `devtools` / `isolated-app` と
