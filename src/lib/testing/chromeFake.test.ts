@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createChromeFake, installChromeFake } from './chromeFake';
+import {
+  acceptedTabUrlPatterns,
+  invalidTabUrlPatterns,
+  tabUrlCases,
+} from './chromeFake.contractCases';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -18,12 +23,9 @@ const isSampleInjectionResult = (
   'filled' in value &&
   typeof value.filled === 'number';
 
-const executeInActiveTab = async (): Promise<SampleInjectionResult | null> => {
-  const [activeTab] = await chrome.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
-
+const executeInTab = async (
+  activeTab?: chrome.tabs.Tab,
+): Promise<SampleInjectionResult | null> => {
   if (
     typeof activeTab?.id !== 'number' ||
     !activeTab.url?.startsWith('https://')
@@ -40,6 +42,12 @@ const executeInActiveTab = async (): Promise<SampleInjectionResult | null> => {
   return isSampleInjectionResult(injectionResult?.result)
     ? injectionResult.result
     : null;
+};
+
+// Query only for popup callers; event handlers pass their original tab instead.
+const executeInActiveTab = async (): Promise<SampleInjectionResult | null> => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return executeInTab(tab);
 };
 
 describe('Chrome fake', () => {
@@ -101,6 +109,112 @@ describe('Chrome fake', () => {
         executeScriptResult: [{ frameId: 0, result: { filled: 1 } }],
       }),
     ).toThrow('executeScriptResult requires activeTab or tabs');
+  });
+
+  it.each([
+    { executeScriptResult: [] },
+    { executeScriptResult: [{ frameId: 0, result: null }] },
+  ])(
+    'rejects configured results with empty tabs (%j)',
+    ({ executeScriptResult }) => {
+      expect(() => createChromeFake({ tabs: [], executeScriptResult })).toThrow(
+        'executeScriptResult requires at least one tab',
+      );
+    },
+  );
+
+  it('keeps the event tab when another window has focus', async () => {
+    const fake = installChromeFake({
+      currentWindowId: 2,
+      tabs: [
+        { active: true, id: 42, windowId: 1, url: 'https://example.com/form' },
+        { active: true, id: 99, windowId: 2, url: 'https://other.example/' },
+      ],
+      executeScriptResult: [{ frameId: 0, result: { filled: 1 } }],
+    });
+    const [eventTab] = await fake.chrome.tabs.query({ windowId: 1 });
+    vi.mocked(fake.chrome.tabs.query).mockClear();
+    await expect(executeInTab(eventTab)).resolves.toEqual({ filled: 1 });
+    expect(fake.chrome.tabs.query).not.toHaveBeenCalled();
+    expect(fake.chrome.scripting.executeScript).toHaveBeenCalledWith(
+      expect.objectContaining({ target: { tabId: 42 } }),
+    );
+    await expect(executeInTab()).resolves.toBeNull();
+  });
+
+  it.each(tabUrlCases)(
+    'matches browser URL contract: $pattern against $url',
+    async ({ url, pattern, matches }) => {
+      const fake = createChromeFake({ activeTab: { id: 1, url } });
+      await expect(
+        fake.chrome.tabs.query({ url: pattern }),
+      ).resolves.toHaveLength(matches ? 1 : 0);
+    },
+  );
+
+  it.each(acceptedTabUrlPatterns)(
+    'accepts tabs.query pattern %s',
+    async (url) => {
+      await expect(
+        createChromeFake().chrome.tabs.query({ url }),
+      ).resolves.toEqual([]);
+    },
+  );
+
+  it.each(invalidTabUrlPatterns)(
+    'rejects invalid pattern even without tabs: %s',
+    async (url) => {
+      await expect(
+        createChromeFake().chrome.tabs.query({ url }),
+      ).rejects.toThrow('Invalid Chrome match pattern');
+    },
+  );
+
+  it.each([
+    'ftp://example.com/file',
+    'ws://example.com/socket',
+    'wss://example.com/socket',
+    'urn:example:test',
+    'data:text/plain,test',
+    'file:///tmp/test',
+  ])(
+    'matches explicit schemes and all URLs but not a wildcard scheme: %s',
+    async (url) => {
+      const fake = createChromeFake({ activeTab: { id: 1, url } });
+      const pattern = url.startsWith('file:')
+        ? 'file:///*'
+        : url.slice(0, url.indexOf(':') + 1) +
+          (url.includes('://') ? '//*/*' : '*');
+      await expect(
+        fake.chrome.tabs.query({ url: pattern }),
+      ).resolves.toHaveLength(1);
+      await expect(
+        fake.chrome.tabs.query({ url: '<all_urls>' }),
+      ).resolves.toHaveLength(1);
+      await expect(fake.chrome.tabs.query({ url: '*://*/*' })).resolves.toEqual(
+        [],
+      );
+    },
+  );
+
+  it('validates all patterns before filtering and ignores missing or malformed tab URLs', async () => {
+    const fake = createChromeFake({
+      tabs: [
+        { active: true, id: 1, url: 'https://example.com/' },
+        { id: 2, url: 'not a URL' },
+        { id: 3 },
+      ],
+    });
+    await expect(
+      fake.chrome.tabs.query({ url: ['<all_urls>', 'https://example.com/*'] }),
+    ).resolves.toEqual([expect.objectContaining({ id: 1 })]);
+    await expect(fake.chrome.tabs.query({ url: [] })).resolves.toEqual([]);
+    await expect(
+      fake.chrome.tabs.query({
+        active: false,
+        url: ['<all_urls>', 'https://example.com'],
+      }),
+    ).rejects.toThrow('Invalid Chrome match pattern');
   });
 
   it('returns tabs in window and tab-strip order', async () => {
@@ -175,7 +289,7 @@ describe('Chrome fake', () => {
     ).resolves.toEqual([expect.objectContaining({ id: 3 })]);
     await expect(
       portFake.chrome.tabs.query({ url: 'https://example.com:8443/*' }),
-    ).rejects.toThrow('Invalid Chrome match pattern');
+    ).resolves.toEqual([expect.objectContaining({ id: 3 })]);
 
     const extensionFake = createChromeFake({
       tabs: [
@@ -194,12 +308,16 @@ describe('Chrome fake', () => {
       tabs: [
         { id: 1, url: 'example.com/form' },
         { active: true, id: 2, url: 'https://ok.example/' },
+        { id: 3, url: 'chrome://bad%hostname/' },
       ],
     });
 
     await expect(
       fake.chrome.tabs.query({ url: 'https://ok.example/*' }),
     ).resolves.toEqual([expect.objectContaining({ id: 2 })]);
+    await expect(
+      fake.chrome.tabs.query({ url: 'chrome://*/*' }),
+    ).resolves.toEqual([]);
   });
 
   it('rejects malformed Chrome match patterns', async () => {
@@ -277,6 +395,41 @@ describe('Chrome fake', () => {
     expect(secondResult?.mutedInfo?.muted).toBe(false);
     expect(secondResult).not.toBe(firstResult);
   });
+
+  it.each(['activeTab', 'tabs'] as const)(
+    'snapshots nested input fixtures for %s',
+    async (mode) => {
+      const tab = { active: true, id: 42, mutedInfo: { muted: false } };
+      const fake = createChromeFake(
+        mode === 'tabs' ? { tabs: [tab] } : { activeTab: tab },
+      );
+      tab.mutedInfo.muted = true;
+      tab.id = 99;
+      await expect(fake.chrome.tabs.query({})).resolves.toEqual([
+        expect.objectContaining({ id: 42, mutedInfo: { muted: false } }),
+      ]);
+    },
+  );
+
+  it('does not inject successfully without any fixture', async () => {
+    await expect(
+      createChromeFake().chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+      }),
+    ).rejects.toThrow('No tab with id: 42');
+  });
+
+  it.each<null | Record<string, number>>([null, {}, { a: 1 }])(
+    'lets guards reject serialized browser results: %j',
+    async (result) => {
+      installChromeFake({
+        activeTab: { id: 42, url: 'https://example.com/' },
+        executeScriptResult: [{ frameId: 0, result }],
+      });
+      await expect(executeInActiveTab()).resolves.toBeNull();
+    },
+  );
 
   it('assigns tab indexes per window and infers a sole current window', async () => {
     const singleWindowFake = createChromeFake({
@@ -567,10 +720,12 @@ describe('Chrome fake', () => {
   });
 
   it('returns isolated script injection results', async () => {
+    const fixture = [{ frameId: 0, result: { summary: { filled: 1 } } }];
     const fake = createChromeFake({
       activeTab: { id: 42 },
-      executeScriptResult: [{ frameId: 0, result: { summary: { filled: 1 } } }],
+      executeScriptResult: fixture,
     });
+    fixture[0].result.summary.filled = 7;
     const injection = {
       target: { tabId: 42 },
       func: () => undefined,

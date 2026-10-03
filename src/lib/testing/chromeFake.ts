@@ -79,7 +79,7 @@ const createTab = (
   const active = tab.active ?? defaults.active;
 
   return {
-    ...tab,
+    ...structuredClone(tab),
     active,
     autoDiscardable: tab.autoDiscardable ?? true,
     discarded: tab.discarded ?? false,
@@ -155,44 +155,134 @@ type ParsedUrlPattern =
   | {
       allUrls: false;
       host: string;
-      path: string;
+      path: RegExp;
+      port: string;
       scheme: string;
     };
+
+// tabs.query uses Chromium URLPattern(SCHEME_ALL), not manifest permissions'
+// narrower scheme set. Standard schemes require ://; opaque schemes use :.
+const standardSchemes = new Set([
+  '*',
+  'http',
+  'https',
+  'file',
+  'ftp',
+  'ws',
+  'wss',
+  'chrome',
+  'chrome-extension',
+  'chrome-untrusted',
+  'devtools',
+]);
+const defaultPorts: Record<string, string> = {
+  http: '80',
+  https: '443',
+  ftp: '21',
+  ws: '80',
+  wss: '443',
+};
+
+const compilePath = (path: string): RegExp =>
+  new RegExp(`^${escapeRegularExpression(path).replaceAll('*', '.*')}$`);
+
+const normalizeHost = (host: string): string => {
+  // Use a standard URL scheme to canonicalize IDNs, IPv6, and case equally
+  // for Chrome-specific schemes and ordinary web URLs.
+  if (/[\s/@?#\\]/.test(host)) throw new TypeError('Invalid host');
+  return new URL(`http://${host}/`).hostname.toLowerCase().replace(/\.+$/, '');
+};
 
 const parseUrlPattern = (pattern: string): ParsedUrlPattern => {
   if (pattern === '<all_urls>') {
     return { allUrls: true };
   }
 
-  const patternParts =
-    /^(http|https|file|chrome-extension|\*):\/\/([^/:]*)(\/.*)$/.exec(pattern);
+  const patternParts = /^([a-z][a-z0-9+.-]*|\*):(.*)$/s.exec(pattern);
   if (!patternParts) {
     throw new TypeError(`Invalid Chrome match pattern: ${pattern}`);
   }
 
-  const [, scheme, host, path] = patternParts;
-  const hostWildcardIsValid =
-    !host.includes('*') || host === '*' || /^\*\.[^*]+$/.test(host);
-  const hostIsValid =
-    scheme === 'file' ? host === '' : host.length > 0 && hostWildcardIsValid;
-  if (!hostIsValid) {
+  const [, scheme, remainder] = patternParts;
+  try {
+    if (
+      !remainder ||
+      standardSchemes.has(scheme) !== remainder.startsWith('//')
+    ) {
+      throw new TypeError();
+    }
+    if (!standardSchemes.has(scheme)) {
+      return {
+        allUrls: false,
+        scheme,
+        host: '*',
+        port: '*',
+        path: compilePath(remainder),
+      };
+    }
+
+    const authorityAndPath = remainder.slice(2);
+    const slash = authorityAndPath.indexOf('/');
+    if (scheme === 'file') {
+      // Chromium ignores the file host and allows file://* as file:///*.
+      const path =
+        slash < 0 ? `/${authorityAndPath}` : authorityAndPath.slice(slash);
+      return {
+        allUrls: false,
+        scheme,
+        host: '*',
+        port: '*',
+        path: compilePath(path),
+      };
+    }
+    if (slash < 1) throw new TypeError();
+    const authority = authorityAndPath.slice(0, slash);
+    const parts = /^(\[[^\]]+\]|[^:]+)(?::(.*))?$/.exec(authority);
+    if (!parts) throw new TypeError();
+    const [, rawHost, explicitPort] = parts;
+    const port = explicitPort ?? '*';
+    if (
+      port !== '*' &&
+      (!Object.hasOwn(defaultPorts, scheme) ||
+        !/^\d+$/.test(port) ||
+        Number(port) > 65535)
+    )
+      throw new TypeError();
+
+    let host = rawHost;
+    if (host !== '*') {
+      const subdomains = host.startsWith('*.');
+      const baseHost = subdomains ? host.slice(2) : host;
+      if (!baseHost || baseHost.includes('*')) throw new TypeError();
+      host = `${subdomains ? '*.' : ''}${normalizeHost(baseHost)}`;
+    }
+    return {
+      allUrls: false,
+      host,
+      port,
+      scheme,
+      path: compilePath(authorityAndPath.slice(slash)),
+    };
+  } catch {
     throw new TypeError(`Invalid Chrome match pattern: ${pattern}`);
   }
-
-  return { allUrls: false, host, path, scheme };
 };
 
-const matchesUrlPattern = (url: string, pattern: string): boolean => {
-  const parsedPattern = parseUrlPattern(pattern);
+const matchesUrlPattern = (
+  url: string,
+  parsedPattern: ParsedUrlPattern,
+): boolean => {
   let parsedUrl: URL;
+  let hostname: string;
   try {
     parsedUrl = new URL(url);
+    hostname = parsedUrl.hostname ? normalizeHost(parsedUrl.hostname) : '';
   } catch {
     return false;
   }
 
   if (parsedPattern.allUrls) {
-    return ['file:', 'http:', 'https:'].includes(parsedUrl.protocol);
+    return true;
   }
 
   const scheme = parsedUrl.protocol.slice(0, -1);
@@ -204,8 +294,7 @@ const matchesUrlPattern = (url: string, pattern: string): boolean => {
     return false;
   }
 
-  const hostname = parsedUrl.hostname.toLowerCase();
-  const normalizedHostPattern = parsedPattern.host.toLowerCase();
+  const normalizedHostPattern = parsedPattern.host;
   const hostMatches = normalizedHostPattern.startsWith('*.')
     ? hostname === normalizedHostPattern.slice(2) ||
       hostname.endsWith(`.${normalizedHostPattern.slice(2)}`)
@@ -214,13 +303,15 @@ const matchesUrlPattern = (url: string, pattern: string): boolean => {
     return false;
   }
 
-  const pathExpression = escapeRegularExpression(parsedPattern.path).replaceAll(
-    '*',
-    '.*',
-  );
-  return new RegExp(`^${pathExpression}$`).test(
-    `${parsedUrl.pathname}${parsedUrl.search}`,
-  );
+  if (
+    parsedPattern.port !== '*' &&
+    parsedPattern.port !== (parsedUrl.port || defaultPorts[scheme])
+  ) {
+    return false;
+  }
+  const pathname =
+    parsedUrl.pathname || (standardSchemes.has(scheme) ? '/' : '');
+  return parsedPattern.path.test(`${pathname}${parsedUrl.search}`);
 };
 
 const supportedTabQueryFilters = new Set([
@@ -237,13 +328,6 @@ const assertSupportedTabQuery = (queryInfo: chrome.tabs.QueryInfo): void => {
       throw new TypeError(`Unsupported chrome.tabs.query filter: ${key}`);
     }
   }
-
-  if (queryInfo.url !== undefined) {
-    const patterns = Array.isArray(queryInfo.url)
-      ? queryInfo.url
-      : [queryInfo.url];
-    patterns.forEach(parseUrlPattern);
-  }
 };
 
 const matchesTabQuery = (
@@ -251,6 +335,7 @@ const matchesTabQuery = (
   queryInfo: chrome.tabs.QueryInfo,
   currentWindowId: number,
   lastFocusedWindowId: number,
+  urlPatterns: ParsedUrlPattern[] | undefined,
 ): boolean => {
   if (queryInfo.active !== undefined && queryInfo.active !== tab.active) {
     return false;
@@ -278,14 +363,11 @@ const matchesTabQuery = (
     }
   }
 
-  if (queryInfo.url !== undefined) {
-    const patterns = Array.isArray(queryInfo.url)
-      ? queryInfo.url
-      : [queryInfo.url];
+  if (urlPatterns !== undefined) {
     const tabUrl = tab.url;
     if (
       !tabUrl ||
-      !patterns.some((pattern) => matchesUrlPattern(tabUrl, pattern))
+      !urlPatterns.some((pattern) => matchesUrlPattern(tabUrl, pattern))
     ) {
       return false;
     }
@@ -352,11 +434,6 @@ const createTabs = (
 
     const windowId = tab.windowId ?? currentWindowId;
     const reservedIndexes = reservedIndexesByWindow.get(windowId) ?? new Set();
-    if (reservedIndexes.has(tab.index)) {
-      throw new TypeError(
-        `Duplicate tab index ${tab.index} in window ${windowId}.`,
-      );
-    }
     reservedIndexes.add(tab.index);
     reservedIndexesByWindow.set(windowId, reservedIndexes);
   }
@@ -553,6 +630,9 @@ export const createChromeFake = (
   if (options.executeScriptResult !== undefined && !hasTabFixture) {
     throw new TypeError('executeScriptResult requires activeTab or tabs.');
   }
+  if (options.executeScriptResult !== undefined && options.tabs?.length === 0) {
+    throw new TypeError('executeScriptResult requires at least one tab.');
+  }
   const scriptResults =
     options.executeScriptResult === undefined
       ? undefined
@@ -666,10 +746,9 @@ export const createChromeFake = (
       executeScript: vi.fn(async (injection: Record<string, unknown>) => {
         assertSingleScriptSource(injection);
         const tabId = getTargetTabId(injection);
-        if (options.executeScriptError && !hasTabFixture) {
-          throw options.executeScriptError;
-        }
-        if (!tabs.some((tab) => tab.id === tabId)) {
+        // Only the legacy error-only fixture may bypass tab existence checks.
+        const requiresTab = hasTabFixture || !options.executeScriptError;
+        if (requiresTab && !tabs.some((tab) => tab.id === tabId)) {
           throw new Error(`No tab with id: ${tabId}.`);
         }
 
@@ -697,6 +776,13 @@ export const createChromeFake = (
     tabs: {
       query: vi.fn(async (queryInfo: chrome.tabs.QueryInfo) => {
         assertSupportedTabQuery(queryInfo);
+        const urlPatterns =
+          queryInfo.url === undefined
+            ? undefined
+            : (Array.isArray(queryInfo.url)
+                ? queryInfo.url
+                : [queryInfo.url]
+              ).map(parseUrlPattern);
         return tabs
           .filter((tab) =>
             matchesTabQuery(
@@ -704,6 +790,7 @@ export const createChromeFake = (
               queryInfo,
               currentWindowId,
               lastFocusedWindowId,
+              urlPatterns,
             ),
           )
           .sort(
