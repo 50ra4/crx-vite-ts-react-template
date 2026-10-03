@@ -3,6 +3,8 @@ import { createChromeFake, installChromeFake } from './chromeFake';
 import {
   acceptedTabUrlPatterns,
   invalidTabUrlPatterns,
+  queryFixtureUrls,
+  tabUrlFilterCases,
   tabUrlCases,
 } from './chromeFake.contractCases';
 
@@ -115,6 +117,41 @@ describe('Chrome fake', () => {
     { executeScriptResult: [] },
     { executeScriptResult: [{ frameId: 0, result: null }] },
   ])(
+    'rejects competing injection result and error fixtures (%j)',
+    ({ executeScriptResult }) => {
+      for (const fixture of [
+        {},
+        { activeTab: { id: 1 } },
+        { tabs: [] },
+        { tabs: [{ id: 1, active: true }] },
+      ]) {
+        expect(() =>
+          createChromeFake({
+            ...fixture,
+            executeScriptResult,
+            executeScriptError: new Error('denied'),
+          }),
+        ).toThrow(
+          'executeScriptResult and executeScriptError cannot be used together.',
+        );
+      }
+    },
+  );
+
+  it('rejects a contradictory activeTab flag without silently overriding it', () => {
+    expect(() =>
+      createChromeFake({ activeTab: { id: 1, active: false } }),
+    ).toThrow('activeTab.active must be true or omitted.');
+    expect(() =>
+      createChromeFake({ activeTab: { id: 1, active: true } }),
+    ).not.toThrow();
+    expect(() => createChromeFake({ activeTab: { id: 1 } })).not.toThrow();
+  });
+
+  it.each([
+    { executeScriptResult: [] },
+    { executeScriptResult: [{ frameId: 0, result: null }] },
+  ])(
     'rejects configured results with empty tabs (%j)',
     ({ executeScriptResult }) => {
       expect(() => createChromeFake({ tabs: [], executeScriptResult })).toThrow(
@@ -149,6 +186,35 @@ describe('Chrome fake', () => {
       await expect(
         fake.chrome.tabs.query({ url: pattern }),
       ).resolves.toHaveLength(matches ? 1 : 0);
+    },
+  );
+
+  it.each(tabUrlFilterCases)(
+    'matches browser URL collection contract: $name',
+    async ({ url, indexes }) => {
+      const fake = createChromeFake({
+        tabs: queryFixtureUrls.map((tabUrl, index) => ({
+          active: index === 0,
+          id: index + 1,
+          url: tabUrl,
+        })),
+      });
+      const tabs = await fake.chrome.tabs.query({ url });
+      expect(tabs.map((tab) => tab.id)).toEqual(
+        indexes.map((index) => index + 1),
+      );
+    },
+  );
+
+  // Convenience for handwritten fixtures; real Tab.url values are normalized.
+  it.each(['https://example.com', 'chrome://version'])(
+    'normalizes handwritten fixture URL %s',
+    async (url) => {
+      await expect(
+        createChromeFake({ activeTab: { id: 1, url } }).chrome.tabs.query({
+          url: `${url}/*`,
+        }),
+      ).resolves.toHaveLength(1);
     },
   );
 
@@ -208,7 +274,10 @@ describe('Chrome fake', () => {
     await expect(
       fake.chrome.tabs.query({ url: ['<all_urls>', 'https://example.com/*'] }),
     ).resolves.toEqual([expect.objectContaining({ id: 1 })]);
-    await expect(fake.chrome.tabs.query({ url: [] })).resolves.toEqual([]);
+    await expect(fake.chrome.tabs.query({ url: [] })).resolves.toHaveLength(3);
+    await expect(
+      fake.chrome.tabs.query({ active: false, url: [] }),
+    ).resolves.toHaveLength(2);
     await expect(
       fake.chrome.tabs.query({
         active: false,

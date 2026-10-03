@@ -161,7 +161,9 @@ type ParsedUrlPattern =
     };
 
 // tabs.query uses Chromium URLPattern(SCHEME_ALL), not manifest permissions'
-// narrower scheme set. Standard schemes require ://; opaque schemes use :.
+// narrower scheme set. Supported desktop standard schemes require ://; opaque
+// schemes use :. Do not accept arbitrary scheme:// patterns: Chromium rejects
+// unregistered ones (including urn://). Keep additions browser-tested.
 const standardSchemes = new Set([
   '*',
   'http',
@@ -172,8 +174,12 @@ const standardSchemes = new Set([
   'wss',
   'chrome',
   'chrome-extension',
+  'chrome-search',
+  'chrome-native',
+  'chrome-distiller',
   'chrome-untrusted',
   'devtools',
+  'isolated-app',
 ]);
 const defaultPorts: Record<string, string> = {
   http: '80',
@@ -268,24 +274,46 @@ const parseUrlPattern = (pattern: string): ParsedUrlPattern => {
   }
 };
 
+type ParsedTabUrl = {
+  hostname: string;
+  path: string;
+  port: string | undefined;
+  scheme: string;
+};
+
+const parseTabUrl = (url: string): ParsedTabUrl | undefined => {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname
+      ? normalizeHost(parsedUrl.hostname)
+      : '';
+    const scheme = parsedUrl.protocol.slice(0, -1);
+    const pathname =
+      parsedUrl.pathname || (standardSchemes.has(scheme) ? '/' : '');
+    // URL.search drops a bare '?'; Chromium PathForRequest preserves it.
+    // Only inspect the portion before '#', so a fragment's '?' is not a query.
+    const withoutFragment = parsedUrl.href.split('#', 1)[0];
+    const queryIndex = withoutFragment.indexOf('?');
+    const search = queryIndex < 0 ? '' : withoutFragment.slice(queryIndex);
+    return {
+      hostname,
+      scheme,
+      port: parsedUrl.port || defaultPorts[scheme],
+      path: `${pathname}${search}`,
+    };
+  } catch {
+    return undefined;
+  }
+};
+
 const matchesUrlPattern = (
-  url: string,
+  { hostname, path, port, scheme }: ParsedTabUrl,
   parsedPattern: ParsedUrlPattern,
 ): boolean => {
-  let parsedUrl: URL;
-  let hostname: string;
-  try {
-    parsedUrl = new URL(url);
-    hostname = parsedUrl.hostname ? normalizeHost(parsedUrl.hostname) : '';
-  } catch {
-    return false;
-  }
-
   if (parsedPattern.allUrls) {
     return true;
   }
 
-  const scheme = parsedUrl.protocol.slice(0, -1);
   const schemeMatches =
     parsedPattern.scheme === '*'
       ? scheme === 'http' || scheme === 'https'
@@ -303,15 +331,10 @@ const matchesUrlPattern = (
     return false;
   }
 
-  if (
-    parsedPattern.port !== '*' &&
-    parsedPattern.port !== (parsedUrl.port || defaultPorts[scheme])
-  ) {
+  if (parsedPattern.port !== '*' && parsedPattern.port !== port) {
     return false;
   }
-  const pathname =
-    parsedUrl.pathname || (standardSchemes.has(scheme) ? '/' : '');
-  return parsedPattern.path.test(`${pathname}${parsedUrl.search}`);
+  return parsedPattern.path.test(path);
 };
 
 const supportedTabQueryFilters = new Set([
@@ -363,8 +386,8 @@ const matchesTabQuery = (
     }
   }
 
-  if (urlPatterns !== undefined) {
-    const tabUrl = tab.url;
+  if (urlPatterns !== undefined && urlPatterns.length > 0) {
+    const tabUrl = tab.url === undefined ? undefined : parseTabUrl(tab.url);
     if (
       !tabUrl ||
       !urlPatterns.some((pattern) => matchesUrlPattern(tabUrl, pattern))
@@ -406,11 +429,7 @@ const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
     throw new TypeError('At least one file must be specified.');
   }
 
-  if (
-    Array.isArray(files) &&
-    files.length > 0 &&
-    !files.every((file: unknown) => typeof file === 'string')
-  ) {
+  if (hasFiles && !files.every((file: unknown) => typeof file === 'string')) {
     throw new TypeError(
       'chrome.scripting.executeScript files must contain only strings.',
     );
@@ -624,6 +643,17 @@ export const createChromeFake = (
   if (options.activeTab && options.tabs) {
     throw new TypeError('activeTab and tabs cannot be used together.');
   }
+  if (options.activeTab?.active === false) {
+    throw new TypeError('activeTab.active must be true or omitted.');
+  }
+  if (
+    options.executeScriptResult !== undefined &&
+    options.executeScriptError !== undefined
+  ) {
+    throw new TypeError(
+      'executeScriptResult and executeScriptError cannot be used together.',
+    );
+  }
 
   const hasTabFixture =
     options.activeTab !== undefined || options.tabs !== undefined;
@@ -746,7 +776,7 @@ export const createChromeFake = (
       executeScript: vi.fn(async (injection: Record<string, unknown>) => {
         assertSingleScriptSource(injection);
         const tabId = getTargetTabId(injection);
-        // Only the legacy error-only fixture may bypass tab existence checks.
+        // The owner-approved error-only fixture bypasses tab existence checks.
         const requiresTab = hasTabFixture || !options.executeScriptError;
         if (requiresTab && !tabs.some((tab) => tab.id === tabId)) {
           throw new Error(`No tab with id: ${tabId}.`);
