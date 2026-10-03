@@ -451,7 +451,15 @@ const getTargetTabId = (injection: Record<string, unknown>): number => {
     typeof target.tabId === 'number' &&
     Number.isInteger(target.tabId)
   ) {
-    const unsupported = Object.keys(target).find((key) => key !== 'tabId');
+    const unsupported = Object.keys(target).find(
+      (key) =>
+        key !== 'tabId' &&
+        !(
+          key === 'allFrames' &&
+          'allFrames' in target &&
+          target.allFrames === false
+        ),
+    );
     if (unsupported) {
       throw new TypeError(`Unsupported executeScript target: ${unsupported}.`);
     }
@@ -464,6 +472,12 @@ const getTargetTabId = (injection: Record<string, unknown>): number => {
 };
 
 const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
+  if (injection.func !== undefined && typeof injection.func !== 'function') {
+    throw new TypeError('executeScript func must be a function.');
+  }
+  if (injection.files !== undefined && !Array.isArray(injection.files)) {
+    throw new TypeError('executeScript files must be an array.');
+  }
   const hasFunc = typeof injection.func === 'function';
   const files = injection.files;
   const hasFiles = Array.isArray(files);
