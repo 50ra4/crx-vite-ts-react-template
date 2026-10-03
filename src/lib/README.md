@@ -10,6 +10,9 @@ entrypoints から利用する共有モジュールの置き場です。
 messaging と storage(local / managed / session / sync)を in-memory で再現し、
 `vi.stubGlobal` でテストごとに注入できる。`activeTab` または `tabs` で対象タブを
 設定し、`executeScriptResult` または `executeScriptError` で注入結果を再現できる。
+両方を同時指定すると、結果が空配列でも生成時に拒否する。
+`activeTab` は `active` の省略または `true` を許可し、`false` は矛盾する指定として
+明示的に拒否する。非activeタブを含む構成には `tabs` を使う。
 複数ウィンドウやクエリ条件は `tabs` と
 `currentWindowId` / `lastFocusedWindowId` で設定する。対応する query 条件は
 `active`、`currentWindow`、`lastFocusedWindow`、`windowId`、`url`。未対応条件は
@@ -20,7 +23,9 @@ window として推論する。`windowId` の指定有無が混在する場合�
 ちょうど1件指定する。
 明示した `index` を先に確保し、省略したタブには各ウィンドウの空き番号を小さい順に
 割り当てる。各ウィンドウの `index` は `0` からの連番でなければならない。
-`executeScriptError` だけを指定した場合は従来どおり任意のタブIDで注入失敗を再現する。
+`executeScriptError` だけの指定は、エラー経路専用のfixtureモードであり、
+タブを登録せず任意の整数タブIDで設定エラーを再現できる。
+引数形式の検証は省略しない。
 `executeScriptResult` だけの指定は許可せず、`activeTab` または1件以上の `tabs` が必要。
 結果を `[]` にした場合も同じで、`tabs: []` と結果の同時指定は生成時に拒否する。
 結果なしの `tabs: []` は「タブがない」分岐のテストに使える。
@@ -39,11 +44,23 @@ window として推論する。`windowId` の指定有無が混在する場合�
 `result` の省略は、不完全な応答への防御を検証するために許可する。
 
 URL条件はmanifestの権限パターンではなく `tabs.query` のパターンとして扱う。
+`url` の省略と `url: []` はどちらもURLによる絞り込みを行わず、URL未指定のタブも
+返す。他のquery条件はそのまま適用する。非空の配列は各パターンのOR条件となる。
 ポート省略・`:*` は全ポート、数値はそのポート（既定の80/443などを含む）に一致する。
 IPv6ホストは `[...]` で指定する。schemeの `*` はhttp/httpsのみ、明示schemeは
 同じschemeだけ、`<all_urls>` は `chrome:`・拡張ページ・`about:blank` も対象とする。
-不正patternは検索前に拒否し、不正なfixture URLや未指定URLは非一致にする。
-単体テストと実ChromiumのE2Eで同じケース表を検証する。
+非空のURL条件では、不正patternを検索前に拒否し、不正なfixture URLや未指定URLは
+非一致にする。空クエリの区切り文字 `?` は保持し、fragmentの `#` 以降は照合しない。
+`scheme://` 形式の対応範囲は `http` / `https` / `file` / `ftp` / `ws` / `wss` /
+`chrome` / `chrome-extension` / `chrome-search` / `chrome-native` /
+`chrome-distiller` / `chrome-untrusted` / `devtools` / `isolated-app` と
+ワイルドカードscheme。その他のschemeは `urn:*` などのopaque形式を扱う。
+Chromiumは未登録schemeの `://` を拒否するため、任意の `scheme://` は受理しない。
+OS固有・将来追加されるschemeやChromeのURL実装全体の再現は保証しない。
+対応追加時は実機で確認して契約テストに追加する。
+単体テストと実ChromiumのE2Eで同じ正規化済みURL・query条件を使い、ブラウザ側は
+作成時に取得したタブIDで照合する。非正規化URLの補完はfake固有の便利機能として
+別の単体テストで検証する。
 fakeは権限付与・URL伏字化・実際のページ注入を行わないので、それらはE2Eでも確認する。
 
 ## activeTab + scripting によるページ注入

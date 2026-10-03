@@ -27,6 +27,10 @@ Vitest + jsdom (`src/**/*.test.{ts,tsx}`), Vitest + Node
   behavior against Chromium; keep shared cases in unit and browser tests instead
   of treating a review assertion as the specification. Injection result fixtures
   describe the serialized API response, not the injected function's raw return.
+- Browser contract tests identify controlled tabs by the ID returned at creation,
+  not by URL (duplicate URLs are valid). Feed both suites the same canonical URLs;
+  test handwritten fixture normalization separately. Include omitted, empty,
+  scalar, and multiple-value query conditions, not only single-pattern matches.
 - Because `installChromeFake` injects the global with `vi.stubGlobal`, call
   `vi.unstubAllGlobals()` in `afterEach`.
 - E2E tests run against the built extension with `npm run e2e`; use
