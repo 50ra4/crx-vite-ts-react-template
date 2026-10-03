@@ -53,6 +53,215 @@ const executeInActiveTab = async (): Promise<SampleInjectionResult | null> => {
 };
 
 describe('Chrome fake', () => {
+  it('returns an isolated main-frame null result by default, preserving explicit empty results', async () => {
+    const fake = createChromeFake({ activeTab: { id: 42 } });
+    const injection = { target: { tabId: 42 }, func: () => undefined };
+    const first = await fake.chrome.scripting.executeScript(injection);
+    expect(first).toEqual([{ frameId: 0, result: null }]);
+    first[0].result = 'changed';
+    await expect(
+      fake.chrome.scripting.executeScript(injection),
+    ).resolves.toEqual([{ frameId: 0, result: null }]);
+    const empty = createChromeFake({
+      activeTab: { id: 42 },
+      executeScriptResult: [],
+    });
+    await expect(
+      empty.chrome.scripting.executeScript(injection),
+    ).resolves.toEqual([]);
+  });
+
+  it('preserves optional document metadata without requiring it', async () => {
+    const fake = createChromeFake({
+      activeTab: { id: 42 },
+      executeScriptResult: [
+        { frameId: 0, documentId: 'test-document', result: null },
+      ],
+    });
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+      }),
+    ).resolves.toEqual([
+      { frameId: 0, documentId: 'test-document', result: null },
+    ]);
+  });
+
+  it.each([NaN, Infinity, -Infinity, -1, 1.5])(
+    'rejects invalid injection frameId %s',
+    (frameId) => {
+      expect(() =>
+        createChromeFake({
+          activeTab: { id: 42 },
+          executeScriptResult: [{ frameId, result: null }],
+        }),
+      ).toThrow('executeScriptResult frameId must be a non-negative integer');
+    },
+  );
+
+  it.each(['direct', 'nested', 'all-holes'])(
+    'rejects sparse serialized results: %s',
+    (mode) => {
+      const values = [1, 2, 3];
+      if (mode === 'all-holes') {
+        delete values[0];
+        delete values[2];
+      }
+      delete values[1];
+      const result = mode === 'nested' ? { nested: values } : values;
+      expect(() =>
+        createChromeFake({
+          activeTab: { id: 42 },
+          executeScriptResult: [{ frameId: 0, result }],
+        }),
+      ).toThrow('executeScriptResult must contain serializable data');
+    },
+  );
+
+  it('rejects holes in the outer injection result array', () => {
+    const results = [{ frameId: 0 }];
+    delete results[0];
+    expect(() =>
+      createChromeFake({
+        activeTab: { id: 42 },
+        executeScriptResult: results,
+      }),
+    ).toThrow('executeScriptResult must be a dense array');
+  });
+
+  it('rejects non-index array properties in serialized results', () => {
+    const result = Object.assign([1, null, 2], {
+      extra: 'not serialized by Chrome',
+    });
+    expect(() =>
+      createChromeFake({
+        activeTab: { id: 42 },
+        executeScriptResult: [{ frameId: 0, result }],
+      }),
+    ).toThrow('executeScriptResult must contain serializable data');
+  });
+
+  it('rejects invalid document metadata from untyped fixtures', () => {
+    expect(() =>
+      createChromeFake({
+        activeTab: { id: 42 },
+        executeScriptResult: [
+          {
+            frameId: 0,
+            // @ts-expect-error runtime validation also protects JavaScript callers
+            documentId: 42,
+          },
+        ],
+      }),
+    ).toThrow('executeScriptResult documentId must be a string');
+  });
+
+  it.each([NaN, Infinity, { nested: NaN }])(
+    'rejects non-finite serialized results %j',
+    (result) => {
+      expect(() =>
+        createChromeFake({
+          activeTab: { id: 42 },
+          executeScriptResult: [{ frameId: 0, result }],
+        }),
+      ).toThrow('executeScriptResult must contain serializable data');
+    },
+  );
+
+  it('rejects cyclic results without rejecting shared noncyclic values', () => {
+    const result: { self?: unknown } = {};
+    result.self = result;
+    expect(() =>
+      createChromeFake({
+        activeTab: { id: 42 },
+        executeScriptResult: [
+          {
+            frameId: 0,
+            // @ts-expect-error deliberately pass an unknown cyclic value as a JS caller can
+            result,
+          },
+        ],
+      }),
+    ).toThrow('executeScriptResult must contain serializable data');
+  });
+
+  it('accepts zero-valued IDs and checks missing targets before default success', async () => {
+    const fake = createChromeFake({
+      activeTab: { id: 0, windowId: 0 },
+      currentWindowId: 0,
+      lastFocusedWindowId: 0,
+    });
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 0 },
+        func: () => undefined,
+      }),
+    ).resolves.toEqual([{ frameId: 0, result: null }]);
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 1 },
+        func: () => undefined,
+      }),
+    ).rejects.toThrow('No tab with id: 1');
+  });
+
+  it('accepts dense serialized null arrays and repeated noncyclic references', async () => {
+    const value = { list: [1, null, 2] };
+    const fake = createChromeFake({
+      activeTab: { id: 42 },
+      executeScriptResult: [{ frameId: 0, result: [value, value] }],
+    });
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+      }),
+    ).resolves.toEqual([{ frameId: 0, result: [value, value] }]);
+  });
+
+  it.each([NaN, Infinity, -Infinity, -1, 1.5])(
+    'rejects invalid tab and window fixture IDs %s',
+    (id) => {
+      expect(() => createChromeFake({ activeTab: { id } })).toThrow(
+        'Invalid tab id',
+      );
+      expect(() => createChromeFake({ tabs: [{ id, active: true }] })).toThrow(
+        'Invalid tab id',
+      );
+      expect(() =>
+        createChromeFake({ activeTab: { id: 42, windowId: id } }),
+      ).toThrow('Invalid tab windowId');
+      expect(() =>
+        createChromeFake({ tabs: [{ id: 42, active: true, windowId: id }] }),
+      ).toThrow('Invalid tab windowId');
+      expect(() => createChromeFake({ currentWindowId: id })).toThrow(
+        'Invalid currentWindowId',
+      );
+      expect(() => createChromeFake({ lastFocusedWindowId: id })).toThrow(
+        'Invalid lastFocusedWindowId',
+      );
+    },
+  );
+
+  it('requires an addressable tab only when an injection result is configured', async () => {
+    for (const fixture of [{ activeTab: {} }, { tabs: [{ active: true }] }]) {
+      expect(() =>
+        createChromeFake({ ...fixture, executeScriptResult: [] }),
+      ).toThrow('executeScriptResult requires a tab with an id');
+      expect(() => createChromeFake(fixture)).not.toThrow();
+    }
+    const fake = createChromeFake({
+      tabs: [{ active: true }, { id: 42 }],
+      executeScriptResult: [{ frameId: 0, result: null }],
+    });
+    await expect(
+      fake.chrome.scripting.executeScript({
+        target: { tabId: 42 },
+        func: () => undefined,
+      }),
+    ).resolves.toEqual([{ frameId: 0, result: null }]);
+  });
   it('supports the activeTab + scripting injection recipe without custom mocks', async () => {
     installChromeFake({
       activeTab: { id: 42, url: 'https://example.com/form' },
@@ -228,11 +437,16 @@ describe('Chrome fake', () => {
   );
 
   it.each(invalidTabUrlPatterns)(
-    'rejects invalid pattern even without tabs: %s',
+    'rejects invalid pattern with and without tabs: %s',
     async (url) => {
-      await expect(
-        createChromeFake().chrome.tabs.query({ url }),
-      ).rejects.toThrow('Invalid Chrome match pattern');
+      for (const options of [
+        {},
+        { activeTab: { id: 1, url: 'https://example.com/' } },
+      ]) {
+        await expect(
+          createChromeFake(options).chrome.tabs.query({ url }),
+        ).rejects.toThrow('Invalid Chrome match pattern');
+      }
     },
   );
 
@@ -387,22 +601,6 @@ describe('Chrome fake', () => {
     await expect(
       fake.chrome.tabs.query({ url: 'chrome://*/*' }),
     ).resolves.toEqual([]);
-  });
-
-  it('rejects malformed Chrome match patterns', async () => {
-    const fake = createChromeFake({
-      activeTab: { id: 1, url: 'https://example.com/' },
-    });
-
-    for (const pattern of [
-      'https://example.com',
-      'example.com/*',
-      'https://exa*.com/*',
-    ]) {
-      await expect(fake.chrome.tabs.query({ url: pattern })).rejects.toThrow(
-        `Invalid Chrome match pattern: ${pattern}`,
-      );
-    }
   });
 
   it('filters explicit and last-focused windows and rejects unsupported filters', async () => {

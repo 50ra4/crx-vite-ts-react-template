@@ -21,6 +21,7 @@ type ChromeFakeOptions = {
 };
 
 type ScriptInjectionResult = {
+  documentId?: string;
   frameId: number;
   result?: unknown;
 };
@@ -34,6 +35,7 @@ type SerializableResult =
   | { [key: string]: SerializableResult };
 
 type ScriptInjectionFixtureResult = {
+  documentId?: string;
   frameId: number;
   result?: SerializableResult;
 };
@@ -122,6 +124,17 @@ const isSerializableResult = (
 
   ancestors.add(value);
   try {
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        if (
+          !Object.hasOwn(value, index) ||
+          !isSerializableResult(value[index], ancestors)
+        ) {
+          return false;
+        }
+      }
+      return Object.keys(value).length === value.length;
+    }
     return Object.values(value).every((item) =>
       isSerializableResult(item, ancestors),
     );
@@ -133,14 +146,32 @@ const isSerializableResult = (
 const cloneInjectionFixture = (
   results: ScriptInjectionFixtureResult[],
 ): ScriptInjectionFixtureResult[] => {
-  try {
-    if (
-      !results.every(
-        ({ result }) => result === undefined || isSerializableResult(result),
-      )
-    ) {
-      throw new TypeError();
+  if (!Array.isArray(results)) {
+    throw new TypeError('executeScriptResult must be a dense array.');
+  }
+  for (let index = 0; index < results.length; index += 1) {
+    if (!Object.hasOwn(results, index)) {
+      throw new TypeError('executeScriptResult must be a dense array.');
     }
+    const entry = results[index];
+    if (!entry || !Number.isInteger(entry.frameId) || entry.frameId < 0) {
+      throw new TypeError(
+        'executeScriptResult frameId must be a non-negative integer.',
+      );
+    }
+    if (
+      entry.documentId !== undefined &&
+      typeof entry.documentId !== 'string'
+    ) {
+      throw new TypeError('executeScriptResult documentId must be a string.');
+    }
+    if (entry.result !== undefined && !isSerializableResult(entry.result)) {
+      throw new TypeError(
+        'executeScriptResult must contain serializable data.',
+      );
+    }
+  }
+  try {
     return structuredClone(results);
   } catch {
     throw new TypeError('executeScriptResult must contain serializable data.');
@@ -155,7 +186,7 @@ type ParsedUrlPattern =
   | {
       allUrls: false;
       host: string;
-      path: RegExp;
+      path: { expression: RegExp; directory?: string };
       port: string;
       scheme: string;
     };
@@ -189,8 +220,15 @@ const defaultPorts: Record<string, string> = {
   wss: '443',
 };
 
-const compilePath = (path: string): RegExp =>
-  new RegExp(`^${escapeRegularExpression(path).replaceAll('*', '.*')}$`);
+const compilePath = (
+  path: string,
+): { expression: RegExp; directory?: string } => ({
+  expression: new RegExp(
+    `^${escapeRegularExpression(path).replaceAll('*', '.*')}$`,
+  ),
+  // Chromium's exception is literal equality, not a second wildcard match.
+  directory: path.endsWith('/*') ? path.slice(0, -2) : undefined,
+});
 
 const normalizeHost = (host: string): string => {
   // Use a standard URL scheme to canonicalize IDNs, IPv6, and case equally
@@ -334,7 +372,10 @@ const matchesUrlPattern = (
   if (parsedPattern.port !== '*' && parsedPattern.port !== port) {
     return false;
   }
-  return parsedPattern.path.test(path);
+  return (
+    path === parsedPattern.path.directory ||
+    parsedPattern.path.expression.test(path)
+  );
 };
 
 const supportedTabQueryFilters = new Set([
@@ -482,7 +523,13 @@ const assertValidTabFixtures = (tabs: chrome.tabs.Tab[]): void => {
   const tabIds = new Set<number>();
 
   for (const tab of tabs) {
+    if (!Number.isInteger(tab.windowId) || tab.windowId < 0) {
+      throw new TypeError(`Invalid tab windowId ${tab.windowId}.`);
+    }
     if (tab.id !== undefined) {
+      if (!Number.isInteger(tab.id) || tab.id < 0) {
+        throw new TypeError(`Invalid tab id ${tab.id}.`);
+      }
       if (tabIds.has(tab.id)) {
         throw new TypeError(`Duplicate tab id ${tab.id}.`);
       }
@@ -655,6 +702,13 @@ export const createChromeFake = (
     );
   }
 
+  for (const key of ['currentWindowId', 'lastFocusedWindowId'] as const) {
+    const value = options[key];
+    if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
+      throw new TypeError(`Invalid ${key} ${value}.`);
+    }
+  }
+
   const hasTabFixture =
     options.activeTab !== undefined || options.tabs !== undefined;
   if (options.executeScriptResult !== undefined && !hasTabFixture) {
@@ -665,7 +719,7 @@ export const createChromeFake = (
   }
   const scriptResults =
     options.executeScriptResult === undefined
-      ? undefined
+      ? [{ frameId: 0, result: null }]
       : cloneInjectionFixture(options.executeScriptResult);
 
   const configuredWindowIds = new Set(
@@ -716,6 +770,12 @@ export const createChromeFake = (
         ]
       : [];
   assertValidTabFixtures(tabs);
+  if (
+    options.executeScriptResult !== undefined &&
+    !tabs.some((tab) => tab.id !== undefined)
+  ) {
+    throw new TypeError('executeScriptResult requires a tab with an id.');
+  }
   const runtimeListeners = new Set<RuntimeMessageListener>();
   const storageListeners = new Set<StorageChangeListener>();
   let runtimeSender: chrome.runtime.MessageSender = { id: extensionId };
@@ -786,7 +846,7 @@ export const createChromeFake = (
           throw options.executeScriptError;
         }
 
-        return structuredClone(scriptResults ?? []);
+        return structuredClone(scriptResults);
       }),
     },
     storage: {

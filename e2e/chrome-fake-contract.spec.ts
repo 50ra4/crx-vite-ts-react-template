@@ -128,7 +128,13 @@ test('documents the serialized values expected by injection result fixtures', as
   await targetPage.goto('https://example.com/injection-contract');
   const results = await extensionPage.evaluate(async (targetTabId) => {
     const values = [];
-    for (const kind of ['undefined-property', 'function', 'dom', 'undefined']) {
+    for (const kind of [
+      'undefined-property',
+      'function',
+      'dom',
+      'undefined',
+      'sparse',
+    ]) {
       // oxlint-disable-next-line no-restricted-globals -- Measure serialization at the browser boundary.
       const [result] = await chrome.scripting.executeScript({
         target: { tabId: targetTabId },
@@ -136,13 +142,28 @@ test('documents the serialized values expected by injection result fixtures', as
           if (value === 'undefined-property') return { title: undefined, a: 1 };
           if (value === 'function') return () => 1;
           if (value === 'dom') return document.body;
+          if (value === 'sparse') {
+            const values = [1, 0, 2];
+            delete values[1];
+            return values;
+          }
           return undefined;
         },
         args: [kind],
       });
-      values.push(result.result);
+      values.push({
+        result: result.result,
+        frameId: result.frameId,
+        hasDocumentId: typeof result.documentId === 'string',
+      });
     }
     return values;
   }, tabId);
-  expect(results).toEqual([{ a: 1 }, null, {}, null]);
+  expect(results).toEqual(
+    [{ a: 1 }, null, {}, null, [1, null, 2]].map((result) => ({
+      result,
+      frameId: 0,
+      hasDocumentId: true,
+    })),
+  );
 });
