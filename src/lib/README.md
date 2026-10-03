@@ -21,11 +21,30 @@ window として推論する。`windowId` の指定有無が混在する場合�
 明示した `index` を先に確保し、省略したタブには各ウィンドウの空き番号を小さい順に
 割り当てる。各ウィンドウの `index` は `0` からの連番でなければならない。
 `executeScriptError` だけを指定した場合は従来どおり任意のタブIDで注入失敗を再現する。
-`executeScriptResult` だけの指定は許可せず、`activeTab` または `tabs` が必要。
+`executeScriptResult` だけの指定は許可せず、`activeTab` または1件以上の `tabs` が必要。
+結果を `[]` にした場合も同じで、`tabs: []` と結果の同時指定は生成時に拒否する。
+結果なしの `tabs: []` は「タブがない」分岐のテストに使える。
 タブを指定した場合は、対象タブの存在を確認してから注入結果またはエラーを返す。
-注入結果はシリアライズ可能なデータに限り、fixture作成時に検証する。
-返却時は毎回コピーするため、型ガードの不正値テストには文字列や不正な形の
-オブジェクトなどを使う。
+タブと注入結果は生成時にも返却時にもdeep cloneし、入力・呼び出し間の変更を分離する。
+
+`executeScriptResult` は **Chromeによる変換後のAPI応答** を指定するfixtureであり、
+注入関数の生の戻り値ではない。`func` の実行やChromeの直列化処理は再現しない。
+結果には `null`・文字列・有限数・真偽値・配列・plain object
+からなるデータを指定し、生成時に検証する。関数やDOMを自動変換したり、元の参照を
+そのまま返したりはしない。例えば実Chromeで `{ title: undefined, a: 1 }` を返す
+ケースは `{ a: 1 }`、関数や `undefined` を返すケースは `null`、`document.body`
+を返すケースは `{}` をfixtureに設定する。これらの変換は
+`e2e/chrome-fake-contract.spec.ts` で実Chromiumにも照合する。
+型ガードの不正値テストには `null`・文字列・不正な形のオブジェクトを使える。
+`result` の省略は、不完全な応答への防御を検証するために許可する。
+
+URL条件はmanifestの権限パターンではなく `tabs.query` のパターンとして扱う。
+ポート省略・`:*` は全ポート、数値はそのポート（既定の80/443などを含む）に一致する。
+IPv6ホストは `[...]` で指定する。schemeの `*` はhttp/httpsのみ、明示schemeは
+同じschemeだけ、`<all_urls>` は `chrome:`・拡張ページ・`about:blank` も対象とする。
+不正patternは検索前に拒否し、不正なfixture URLや未指定URLは非一致にする。
+単体テストと実ChromiumのE2Eで同じケース表を検証する。
+fakeは権限付与・URL伏字化・実際のページ注入を行わないので、それらはE2Eでも確認する。
 
 ## activeTab + scripting によるページ注入
 
@@ -34,9 +53,15 @@ window として推論する。`windowId` の指定有無が混在する場合�
 
 1. `manifest.config.ts` の `permissions` に `activeTab` と `scripting` を追加し、
    `scripts/expected-manifest.config.mjs` の期待値も同時に更新する
-2. `activeTab` の一時的な host 権限を得るため、action の `onClicked`、command、
-   context menu などユーザー操作を起点に処理を呼び出す
-3. `chrome.tabs.query({ active: true, currentWindow: true })` で対象タブを取得する
+2. `activeTab` の一時的な host 権限を得るため、actionのクリックで開くpopup、
+   `action.onClicked`、command、context menuなどユーザー操作を起点に呼び出す。
+   このテンプレートはpopupを設定済みなので、`action.onClicked` を使う場合は
+   `action.default_popup` と対応するmanifest期待値も変更する。
+   popupがある間は `onClicked` が発火しない（[Chrome公式](https://developer.chrome.com/docs/extensions/reference/api/action#popup)）
+3. イベントハンドラではイベント引数の `tab` をそのまま使い、欠落時は処理しない。
+   別ウィンドウへフォーカスが移る可能性があるので、service worker側で取り直さない。
+   popupから呼ぶ場合のみ `chrome.tabs.query({ active: true, currentWindow: true })`
+   で対象を取得する。取得後はそのタブを手順4・5へ渡す
 4. タブ ID の欠落、権限不足で `url` が `undefined` の場合、`chrome:` など注入禁止
    URL を拒否する
 5. `chrome.scripting.executeScript` で対象タブへ関数を注入する
@@ -51,7 +76,8 @@ installChromeFake({
 });
 ```
 
-成功、権限不足で URL が伏字化された場合、注入禁止 URL、不正な戻り値のサンプルは
+成功、イベント対象とフォーカス先が異なる場合、権限不足でURLが伏字化された場合、
+注入禁止URL、不正な戻り値のサンプルは
 `src/lib/testing/chromeFake.test.ts` を参照する。
 
 ## messaging(`src/lib/messaging/`)

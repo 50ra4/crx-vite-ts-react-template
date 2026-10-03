@@ -22,6 +22,11 @@ Vitest + jsdom (`src/**/*.test.{ts,tsx}`), Vitest + Node
   keep regression tests for previously supported fixture modes and failure paths.
   In particular, preserve `executeScriptError`-only behavior while checking tab
   existence whenever `activeTab` or `tabs` is supplied.
+- Before revising a reviewed fake contract, inspect resolved threads as well as
+  open ones and retain owner-approved fixture decisions. Verify disputed browser
+  behavior against Chromium; keep shared cases in unit and browser tests instead
+  of treating a review assertion as the specification. Injection result fixtures
+  describe the serialized API response, not the injected function's raw return.
 - Because `installChromeFake` injects the global with `vi.stubGlobal`, call
   `vi.unstubAllGlobals()` in `afterEach`.
 - E2E tests run against the built extension with `npm run e2e`; use
