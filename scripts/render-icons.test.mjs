@@ -139,6 +139,29 @@ test('renders into an explicit output directory', async () => {
   ).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
+test('writes provenance derived only from the SVG and renderer source to every PNG', async () => {
+  const { browserType } = createFakeBrowserType();
+  const rendererSource = await readFile(
+    fileURLToPath(new URL('./render-icons.mjs', import.meta.url)),
+    'utf8',
+  );
+  const expectedProvenances = [NORMAL_SVG, DEVELOPMENT_SVG].flatMap((svg) =>
+    Array(3).fill(createIconProvenance({ rendererSource, svg })),
+  );
+
+  await renderIcons({ browserType, repositoryDirectory });
+
+  const writtenProvenances = await Promise.all(
+    ICON_FILENAMES.map(async (filename) =>
+      getPngText(
+        await readFile(join(repositoryDirectory, 'public', 'logo', filename)),
+        ICON_PROVENANCE_KEY,
+      ),
+    ),
+  );
+  expect(writtenProvenances).toEqual(expectedProvenances);
+});
+
 test('normalizes line endings in provenance inputs', () => {
   const lf = createIconProvenance({
     rendererSource: 'const size = 16;\n',
@@ -152,9 +175,8 @@ test('normalizes line endings in provenance inputs', () => {
   expect(crlf).toBe(lf);
 });
 
-test('changes provenance with renderer code but not the Playwright version', () => {
+test('changes provenance with renderer code', () => {
   const input = {
-    playwrightVersion: '1.2.3',
     rendererSource: 'const size = 16;',
     svg: '<svg></svg>',
   };
@@ -162,9 +184,6 @@ test('changes provenance with renderer code but not the Playwright version', () 
   expect(
     createIconProvenance({ ...input, rendererSource: 'const size = 48;' }),
   ).not.toBe(createIconProvenance(input));
-  expect(createIconProvenance({ ...input, playwrightVersion: '1.2.4' })).toBe(
-    createIconProvenance(input),
-  );
 });
 
 test.each([
