@@ -13,6 +13,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync, inflateSync } from 'node:zlib';
 
+import { setPngText } from './png-metadata.mjs';
+import { ICON_SOURCE_HASH_KEY } from './render-icons.mjs';
 import { verifyIcons } from './verify-icons.mjs';
 
 const ICON_FILENAMES = [
@@ -26,6 +28,8 @@ const ICON_FILENAMES = [
 const fixtureIconDirectory = fileURLToPath(
   new URL('../public/logo/', import.meta.url),
 );
+const NORMAL_SOURCE_HASH = 'a'.repeat(64);
+const DEVELOPMENT_SOURCE_HASH = 'b'.repeat(64);
 
 let repositoryDirectory;
 let fixtureIcons;
@@ -97,7 +101,13 @@ beforeAll(async () => {
     await Promise.all(
       ICON_FILENAMES.map(async (filename) => [
         filename,
-        await readFile(join(fixtureIconDirectory, filename)),
+        setPngText(
+          await readFile(join(fixtureIconDirectory, filename)),
+          ICON_SOURCE_HASH_KEY,
+          filename.includes('-dev')
+            ? DEVELOPMENT_SOURCE_HASH
+            : NORMAL_SOURCE_HASH,
+        ),
       ]),
     ),
   );
@@ -126,10 +136,26 @@ test('accepts generated icons that byte-match the committed icons', async () => 
   });
 });
 
-test('accepts matching pixels when PNG compression differs', async () => {
+test('accepts matching source hashes when PNG compression differs', async () => {
   const render = vi.fn(async ({ outputDirectory }) => {
     await writeIcons(outputDirectory, {
       'icon16.png': recompressPng(fixtureIcons['icon16.png']),
+    });
+  });
+
+  await expect(verifyIcons({ render, repositoryDirectory })).resolves.toBe(
+    undefined,
+  );
+});
+
+test('accepts platform-specific pixels when SVG source hashes match', async () => {
+  const render = vi.fn(async ({ outputDirectory }) => {
+    await writeIcons(outputDirectory, {
+      'icon16.png': setPngText(
+        fixtureIcons['icon16-dev.png'],
+        ICON_SOURCE_HASH_KEY,
+        NORMAL_SOURCE_HASH,
+      ),
     });
   });
 

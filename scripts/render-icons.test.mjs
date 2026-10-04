@@ -1,11 +1,13 @@
 // @vitest-environment node
 
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { renderIcons } from './render-icons.mjs';
+import { getPngText } from './png-metadata.mjs';
+import { ICON_SOURCE_HASH_KEY, renderIcons } from './render-icons.mjs';
 
 const NORMAL_SVG = '<svg data-variant="normal"></svg>';
 const DEVELOPMENT_SVG = '<svg data-variant="development"></svg>';
@@ -13,6 +15,7 @@ const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const committedIconDirectory = fileURLToPath(
   new URL('../public/logo/', import.meta.url),
 );
+const pngFixture = await readFile(join(committedIconDirectory, 'icon16.png'));
 
 const createFakeBrowserType = ({ failingScreenshot = 0 } = {}) => {
   const pages = [];
@@ -29,7 +32,7 @@ const createFakeBrowserType = ({ failingScreenshot = 0 } = {}) => {
           if (pageNumber === failingScreenshot) {
             throw new Error('Screenshot failed');
           }
-          await writeFile(path, `icon-${pageNumber}`);
+          await writeFile(path, pngFixture);
         }),
       };
       const page = {
@@ -105,15 +108,23 @@ test('renders normal and development SVGs at every extension icon size', async (
   expect(
     pages.map(({ locator }) => locator.screenshot.mock.calls[0][0]),
   ).toEqual(expectedPaths.map((path) => ({ omitBackground: true, path })));
+  const normalHash = createHash('sha256').update(NORMAL_SVG).digest('hex');
+  const developmentHash = createHash('sha256')
+    .update(DEVELOPMENT_SVG)
+    .digest('hex');
   await expect(
-    Promise.all(expectedPaths.map((path) => readFile(path, 'utf8'))),
+    Promise.all(
+      expectedPaths.map(async (path) =>
+        getPngText(await readFile(path), ICON_SOURCE_HASH_KEY),
+      ),
+    ),
   ).resolves.toEqual([
-    'icon-1',
-    'icon-2',
-    'icon-3',
-    'icon-4',
-    'icon-5',
-    'icon-6',
+    normalHash,
+    normalHash,
+    normalHash,
+    developmentHash,
+    developmentHash,
+    developmentHash,
   ]);
   for (const { page } of pages) {
     expect(page.close).toHaveBeenCalledOnce();
@@ -131,9 +142,10 @@ test('renders into an explicit output directory', async () => {
     repositoryDirectory,
   });
 
-  await expect(
-    readFile(join(outputDirectory, 'icon16.png'), 'utf8'),
-  ).resolves.toBe('icon-1');
+  const rendered = await readFile(join(outputDirectory, 'icon16.png'));
+  expect(getPngText(rendered, ICON_SOURCE_HASH_KEY)).toBe(
+    createHash('sha256').update(NORMAL_SVG).digest('hex'),
+  );
   await expect(
     readFile(join(repositoryDirectory, 'public', 'logo', 'icon16.png')),
   ).rejects.toMatchObject({ code: 'ENOENT' });

@@ -121,6 +121,8 @@ entrypoints; the manifest is generated from
 - `npm run verify` remains Chromium-free.
 - `npm run verify:full` runs `verify`, the real-Chromium icon drift check, and
   the real-Chromium E2E suite.
+- Icon rendering embeds each source SVG's SHA-256 in PNG metadata; drift
+  verification compares that provenance because raster bytes vary by OS.
 
 | Change | Run |
 | --- | --- |
