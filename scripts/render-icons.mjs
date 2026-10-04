@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,20 +20,13 @@ const defaultRepositoryDirectory = fileURLToPath(
   new URL('../', import.meta.url),
 );
 const rendererSource = await readFile(fileURLToPath(import.meta.url), 'utf8');
-const require = createRequire(import.meta.url);
-const playwrightVersion = require('@playwright/test/package.json').version;
 
 const normalizeLineEndings = (value) => value.replaceAll(/\r\n?/gu, '\n');
 
-export const createIconProvenance = ({
-  playwrightVersion: version,
-  rendererSource: source,
-  svg,
-}) =>
+export const createIconProvenance = ({ rendererSource: source, svg }) =>
   createHash('sha256')
     .update(
       JSON.stringify({
-        playwrightVersion: version,
         rendererSource: normalizeLineEndings(source),
         svg: normalizeLineEndings(svg),
       }),
@@ -61,7 +53,6 @@ export const renderIcons = async ({
         'utf8',
       );
       const provenance = createIconProvenance({
-        playwrightVersion,
         rendererSource,
         svg,
       });

@@ -133,9 +133,10 @@ DevTools パネルのサーフェスは意図的に含めていません。必�
 - `npm run verify` は Chromium 不要のままです。`verify:full` は
   `verify:icons` と E2E を追加実行します。アイコン検証は一時ディレクトリへ
   生成するため、`public/logo/` のコミット済みファイルを変更しません。
-- `render:icons` は、改行を正規化した SVG、レンダラ実装、Playwright 版の
-  SHA-256 provenance を各 PNG に記録します。`verify:icons` は provenance と
-  寸法の完全一致に加え、OSごとの Chromium 描画差を許容したRGBA画素比較を行います。
+- `render:icons` は、改行を正規化した SVG とレンダラ実装の SHA-256
+  provenance を各 PNG に記録します。`verify:icons` は provenance と寸法の
+  完全一致に加え、レンダラ版やOSごとの Chromium 描画差を許容したRGBA画素比較を
+  行います。
 - E2E は dev サーバではなく**ビルド成果物**を読み込むため、先にビルドします:
   `npm run build && npm run e2e`
 - コード変更後は `npm run verify` の1コマンドで安全性を証明できます。

@@ -141,12 +141,10 @@ test('renders into an explicit output directory', async () => {
 
 test('normalizes line endings in provenance inputs', () => {
   const lf = createIconProvenance({
-    playwrightVersion: '1.2.3',
     rendererSource: 'const size = 16;\n',
     svg: '<svg>\n</svg>\n',
   });
   const crlf = createIconProvenance({
-    playwrightVersion: '1.2.3',
     rendererSource: 'const size = 16;\r\n',
     svg: '<svg>\r\n</svg>\r\n',
   });
@@ -154,7 +152,7 @@ test('normalizes line endings in provenance inputs', () => {
   expect(crlf).toBe(lf);
 });
 
-test('changes provenance with the renderer implementation or Playwright version', () => {
+test('changes provenance with renderer code but not the Playwright version', () => {
   const input = {
     playwrightVersion: '1.2.3',
     rendererSource: 'const size = 16;',
@@ -164,9 +162,9 @@ test('changes provenance with the renderer implementation or Playwright version'
   expect(
     createIconProvenance({ ...input, rendererSource: 'const size = 48;' }),
   ).not.toBe(createIconProvenance(input));
-  expect(
-    createIconProvenance({ ...input, playwrightVersion: '1.2.4' }),
-  ).not.toBe(createIconProvenance(input));
+  expect(createIconProvenance({ ...input, playwrightVersion: '1.2.4' })).toBe(
+    createIconProvenance(input),
+  );
 });
 
 test.each([

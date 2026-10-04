@@ -138,10 +138,10 @@ Notes:
 - `npm run verify` remains Chromium-free. `npm run verify:full` adds
   `verify:icons` and E2E; icon verification renders into a temporary directory
   and never rewrites committed files under `public/logo/`.
-- `render:icons` records a SHA-256 provenance of the normalized SVG, renderer
-  implementation, and Playwright version in each PNG. `verify:icons` requires
-  exact provenance and dimensions, then compares RGBA pixels with a small
-  tolerance for OS-specific Chromium rasterization differences.
+- `render:icons` records a SHA-256 provenance of the normalized SVG and renderer
+  implementation in each PNG. `verify:icons` requires exact provenance and
+  dimensions, then compares RGBA pixels with a small tolerance for
+  rasterization differences across Chromium versions and operating systems.
 - E2E loads the **build output**, not the dev server, so build first:
   `npm run build && npm run e2e`.
 - After changing code, `npm run verify` is the single command that proves the
