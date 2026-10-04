@@ -18,6 +18,25 @@ Vitest + jsdom (`src/**/*.test.{ts,tsx}`), Vitest + Node
 - Tests that use Chrome APIs must call `installChromeFake` from
   `src/lib/testing/chromeFake.ts`. Do not duplicate runtime messaging or storage
   mocks in individual test files.
+- When changing `chromeFake` fixture validation or injection error precedence,
+  keep regression tests for previously supported fixture modes and failure paths.
+  In particular, preserve `executeScriptError`-only behavior while checking tab
+  existence whenever `activeTab` or `tabs` is supplied.
+- Error-only fixtures let tests reproduce injection failures for arbitrary
+  integer tab IDs without registering tabs; explicit tab fixtures still check
+  existence first. Preserve this distinction when revising validation.
+- Before revising a reviewed fake contract, inspect resolved threads as well as
+  open ones to avoid reintroducing previously fixed regressions. Verify disputed browser
+  behavior against Chromium; keep shared cases in unit and browser tests instead
+  of treating a review assertion as the specification. Injection result fixtures
+  describe the serialized API response, not the injected function's raw return.
+- Do not apply serialized-result validation recursively to injection arguments.
+  Test nullish optional properties and top-level versus nested argument values
+  against Chromium using the same case constructors as the fake tests.
+- Browser contract tests identify controlled tabs by the ID returned at creation,
+  not by URL (duplicate URLs are valid). Feed both suites the same canonical URLs;
+  test handwritten fixture normalization separately. Include omitted, empty,
+  scalar, and multiple-value query conditions, not only single-pattern matches.
 - Because `installChromeFake` injects the global with `vi.stubGlobal`, call
   `vi.unstubAllGlobals()` in `afterEach`.
 - E2E tests run against the built extension with `npm run e2e`; use
