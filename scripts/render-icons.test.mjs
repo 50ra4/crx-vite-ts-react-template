@@ -5,7 +5,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { renderIcons } from './render-icons.mjs';
+import { getPngText } from './png-metadata.mjs';
+import {
+  createIconProvenance,
+  ICON_FILENAMES,
+  ICON_PROVENANCE_KEY,
+  renderIcons,
+} from './render-icons.mjs';
 
 const NORMAL_SVG = '<svg data-variant="normal"></svg>';
 const DEVELOPMENT_SVG = '<svg data-variant="development"></svg>';
@@ -13,6 +19,7 @@ const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const committedIconDirectory = fileURLToPath(
   new URL('../public/logo/', import.meta.url),
 );
+const pngFixture = await readFile(join(committedIconDirectory, 'icon16.png'));
 
 const createFakeBrowserType = ({ failingScreenshot = 0 } = {}) => {
   const pages = [];
@@ -25,11 +32,11 @@ const createFakeBrowserType = ({ failingScreenshot = 0 } = {}) => {
           void callback;
           return dimension;
         }),
-        screenshot: vi.fn(async ({ path }) => {
+        screenshot: vi.fn(async () => {
           if (pageNumber === failingScreenshot) {
             throw new Error('Screenshot failed');
           }
-          await writeFile(path, `icon-${pageNumber}`);
+          return pngFixture;
         }),
       };
       const page = {
@@ -94,31 +101,89 @@ test('renders normal and development SVGs at every extension icon size', async (
     Array(6).fill('svg'),
   );
 
-  const expectedPaths = [
-    'icon16.png',
-    'icon48.png',
-    'icon128.png',
-    'icon16-dev.png',
-    'icon48-dev.png',
-    'icon128-dev.png',
-  ].map((filename) => join(repositoryDirectory, 'public', 'logo', filename));
+  const expectedPaths = ICON_FILENAMES.map((filename) =>
+    join(repositoryDirectory, 'public', 'logo', filename),
+  );
   expect(
     pages.map(({ locator }) => locator.screenshot.mock.calls[0][0]),
-  ).toEqual(expectedPaths.map((path) => ({ omitBackground: true, path })));
-  await expect(
-    Promise.all(expectedPaths.map((path) => readFile(path, 'utf8'))),
-  ).resolves.toEqual([
-    'icon-1',
-    'icon-2',
-    'icon-3',
-    'icon-4',
-    'icon-5',
-    'icon-6',
-  ]);
+  ).toEqual(Array(6).fill({ omitBackground: true }));
+  const provenances = await Promise.all(
+    expectedPaths.map(async (path) =>
+      getPngText(await readFile(path), ICON_PROVENANCE_KEY),
+    ),
+  );
+  expect(provenances[0]).toMatch(/^[a-f0-9]{64}$/u);
+  expect(provenances.slice(0, 3)).toEqual(Array(3).fill(provenances[0]));
+  expect(provenances[3]).not.toBe(provenances[0]);
+  expect(provenances.slice(3)).toEqual(Array(3).fill(provenances[3]));
   for (const { page } of pages) {
     expect(page.close).toHaveBeenCalledOnce();
   }
   expect(browser.close).toHaveBeenCalledOnce();
+});
+
+test('renders into an explicit output directory', async () => {
+  const { browserType } = createFakeBrowserType();
+  const outputDirectory = join(repositoryDirectory, 'generated-icons');
+
+  await renderIcons({
+    browserType,
+    outputDirectory,
+    repositoryDirectory,
+  });
+
+  const rendered = await readFile(join(outputDirectory, 'icon16.png'));
+  expect(getPngText(rendered, ICON_PROVENANCE_KEY)).toMatch(/^[a-f0-9]{64}$/u);
+  await expect(
+    readFile(join(repositoryDirectory, 'public', 'logo', 'icon16.png')),
+  ).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+test('writes provenance derived only from the SVG and renderer source to every PNG', async () => {
+  const { browserType } = createFakeBrowserType();
+  const rendererSource = await readFile(
+    fileURLToPath(new URL('./render-icons.mjs', import.meta.url)),
+    'utf8',
+  );
+  const expectedProvenances = [NORMAL_SVG, DEVELOPMENT_SVG].flatMap((svg) =>
+    Array(3).fill(createIconProvenance({ rendererSource, svg })),
+  );
+
+  await renderIcons({ browserType, repositoryDirectory });
+
+  const writtenProvenances = await Promise.all(
+    ICON_FILENAMES.map(async (filename) =>
+      getPngText(
+        await readFile(join(repositoryDirectory, 'public', 'logo', filename)),
+        ICON_PROVENANCE_KEY,
+      ),
+    ),
+  );
+  expect(writtenProvenances).toEqual(expectedProvenances);
+});
+
+test('normalizes line endings in provenance inputs', () => {
+  const lf = createIconProvenance({
+    rendererSource: 'const size = 16;\n',
+    svg: '<svg>\n</svg>\n',
+  });
+  const crlf = createIconProvenance({
+    rendererSource: 'const size = 16;\r\n',
+    svg: '<svg>\r\n</svg>\r\n',
+  });
+
+  expect(crlf).toBe(lf);
+});
+
+test('changes provenance with renderer code', () => {
+  const input = {
+    rendererSource: 'const size = 16;',
+    svg: '<svg></svg>',
+  };
+
+  expect(
+    createIconProvenance({ ...input, rendererSource: 'const size = 48;' }),
+  ).not.toBe(createIconProvenance(input));
 });
 
 test.each([

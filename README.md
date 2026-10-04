@@ -123,17 +123,25 @@ and `.claude/skills/add-entrypoint/SKILL.md`.
 | `npm test`                | Vitest unit tests (jsdom; `npm run test -- --watch` for watch mode)       |
 | `npm run e2e`             | Playwright smoke tests against the built extension in a real Chromium     |
 | `npm run render:icons`    | Regenerates normal/dev PNG icons from `assets/branding/*.svg`             |
+| `npm run verify:icons`    | Fails when committed PNG icons differ from their SVG or renderer           |
 | `npm run lint`            | Oxlint, check-only (includes the `chrome.*` boundary rule)                |
 | `npm run format`          | Prettier, rewrites files                                                  |
 | `npm run check-type`      | `tsc --noEmit`                                                            |
 | `npm run verify:manifest` | Asserts the built `extension/manifest.json` against the pinned allowlists |
 | `npm run verify`          | check-type → lint → test → build → verify:manifest, in series             |
-| `npm run verify:full`     | `verify` + `e2e` — the full contract                                      |
+| `npm run verify:full`     | `verify` + icon drift check + `e2e` — the full contract                   |
 
 Notes:
 
-- E2E and icon rendering require Chromium once:
+- E2E, icon rendering, and icon drift verification require Chromium once:
   `npx playwright install chromium`.
+- `npm run verify` remains Chromium-free. `npm run verify:full` adds
+  `verify:icons` and E2E; icon verification renders into a temporary directory
+  and never rewrites committed files under `public/logo/`.
+- `render:icons` records a SHA-256 provenance of the normalized SVG and renderer
+  implementation in each PNG. `verify:icons` requires exact provenance and
+  dimensions, then compares RGBA pixels with a small tolerance for
+  rasterization differences across Chromium versions and operating systems.
 - E2E loads the **build output**, not the dev server, so build first:
   `npm run build && npm run e2e`.
 - After changing code, `npm run verify` is the single command that proves the
@@ -141,8 +149,9 @@ Notes:
   extension's runtime wiring (entrypoints, messaging, manifest).
 
 CI ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) runs the same
-checks — type check, lint, unit tests, build + manifest verification, and the
-real-Chromium E2E — on every push to `main` and every pull request.
+checks — type check, lint, unit tests, build + manifest verification, icon
+drift verification, and the real-Chromium E2E — on every push to `main` and
+every pull request.
 
 ## Architecture
 
@@ -197,6 +206,7 @@ The template separates reusable infrastructure (`src/lib/`) from sample code:
    development SVG sources in `assets/branding/`, then run
    `npm run render:icons` to regenerate the 16/48/128 px PNG files in
    `public/logo/`. Development icon filenames keep the `-dev` suffix.
+   `npm run verify:icons` fails until the committed PNGs match the SVG sources.
    `npm run verify:manifest` warns while `displayName` still has the template
    default.
 4. Adjust or remove the content script `matches` (`https://example.com/*`) in
