@@ -13,60 +13,30 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync, inflateSync } from 'node:zlib';
 
-import { setPngText } from './png-metadata.mjs';
-import { ICON_SOURCE_HASH_KEY } from './render-icons.mjs';
+import {
+  createPngChunk,
+  decodeRgbaPng,
+  parsePngChunks,
+  PNG_SIGNATURE,
+  setPngText,
+} from './png-metadata.mjs';
+import { ICON_FILENAMES, ICON_PROVENANCE_KEY } from './render-icons.mjs';
 import { verifyIcons } from './verify-icons.mjs';
 
-const ICON_FILENAMES = [
-  'icon16.png',
-  'icon48.png',
-  'icon128.png',
-  'icon16-dev.png',
-  'icon48-dev.png',
-  'icon128-dev.png',
-];
 const fixtureIconDirectory = fileURLToPath(
   new URL('../public/logo/', import.meta.url),
 );
-const NORMAL_SOURCE_HASH = 'a'.repeat(64);
-const DEVELOPMENT_SOURCE_HASH = 'b'.repeat(64);
+const NORMAL_PROVENANCE = 'a'.repeat(64);
+const DEVELOPMENT_PROVENANCE = 'b'.repeat(64);
 
 let repositoryDirectory;
 let fixtureIcons;
 
-const createPngChunk = (type, data) => {
-  const typeBuffer = Buffer.from(type, 'ascii');
-  const chunk = Buffer.alloc(data.length + 12);
-  chunk.writeUInt32BE(data.length);
-  typeBuffer.copy(chunk, 4);
-  data.copy(chunk, 8);
-
-  let crc = 0xffffffff;
-  for (const byte of Buffer.concat([typeBuffer, data])) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-    }
-  }
-  chunk.writeUInt32BE((crc ^ 0xffffffff) >>> 0, data.length + 8);
-  return chunk;
-};
-
 const recompressPng = (png) => {
-  const chunks = [];
+  const chunks = parsePngChunks(png);
   const idatData = [];
-  let offset = 8;
-  while (offset < png.length) {
-    const length = png.readUInt32BE(offset);
-    const type = png.subarray(offset + 4, offset + 8).toString('ascii');
-    const data = png.subarray(offset + 8, offset + 8 + length);
-    chunks.push({
-      data,
-      raw: png.subarray(offset, offset + length + 12),
-      type,
-    });
-    if (type === 'IDAT') idatData.push(data);
-    offset += length + 12;
+  for (const chunk of chunks) {
+    if (chunk.type === 'IDAT') idatData.push(chunk.data);
   }
 
   const recompressed = deflateSync(inflateSync(Buffer.concat(idatData)), {
@@ -74,13 +44,37 @@ const recompressPng = (png) => {
   });
   let wroteIdat = false;
   return Buffer.concat([
-    png.subarray(0, 8),
+    PNG_SIGNATURE,
     ...chunks.flatMap((chunk) => {
       if (chunk.type !== 'IDAT') return [chunk.raw];
       if (wroteIdat) return [];
       wroteIdat = true;
       return [createPngChunk('IDAT', recompressed)];
     }),
+  ]);
+};
+
+const encodeRgbaPng = ({ height, pixels, width }) => {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 6;
+  const rowLength = width * 4;
+  const scanlines = Buffer.alloc((rowLength + 1) * height);
+  for (let row = 0; row < height; row += 1) {
+    pixels.copy(
+      scanlines,
+      row * (rowLength + 1) + 1,
+      row * rowLength,
+      (row + 1) * rowLength,
+    );
+  }
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    createPngChunk('IHDR', header),
+    createPngChunk('IDAT', deflateSync(scanlines)),
+    createPngChunk('IEND', Buffer.alloc(0)),
   ]);
 };
 
@@ -103,10 +97,10 @@ beforeAll(async () => {
         filename,
         setPngText(
           await readFile(join(fixtureIconDirectory, filename)),
-          ICON_SOURCE_HASH_KEY,
+          ICON_PROVENANCE_KEY,
           filename.includes('-dev')
-            ? DEVELOPMENT_SOURCE_HASH
-            : NORMAL_SOURCE_HASH,
+            ? DEVELOPMENT_PROVENANCE
+            : NORMAL_PROVENANCE,
         ),
       ]),
     ),
@@ -148,19 +142,54 @@ test('accepts matching source hashes when PNG compression differs', async () => 
   );
 });
 
-test('accepts platform-specific pixels when SVG source hashes match', async () => {
+test('accepts a negligible pixel difference when provenance matches', async () => {
+  const image = decodeRgbaPng(fixtureIcons['icon16.png']);
+  const pixels = Buffer.from(image.pixels);
+  pixels[0] = (pixels[0] + 1) & 0xff;
   const render = vi.fn(async ({ outputDirectory }) => {
     await writeIcons(outputDirectory, {
       'icon16.png': setPngText(
-        fixtureIcons['icon16-dev.png'],
-        ICON_SOURCE_HASH_KEY,
-        NORMAL_SOURCE_HASH,
+        encodeRgbaPng({ ...image, pixels }),
+        ICON_PROVENANCE_KEY,
+        NORMAL_PROVENANCE,
       ),
     });
   });
 
   await expect(verifyIcons({ render, repositoryDirectory })).resolves.toBe(
     undefined,
+  );
+});
+
+test('rejects another variant pixels even when provenance matches', async () => {
+  const render = vi.fn(async ({ outputDirectory }) => {
+    await writeIcons(outputDirectory, {
+      'icon16.png': setPngText(
+        fixtureIcons['icon16-dev.png'],
+        ICON_PROVENANCE_KEY,
+        NORMAL_PROVENANCE,
+      ),
+    });
+  });
+
+  await expect(verifyIcons({ render, repositoryDirectory })).rejects.toThrow(
+    /icon16\.png \(pixel difference /u,
+  );
+});
+
+test('rejects a dimension mismatch even when provenance matches', async () => {
+  const render = vi.fn(async ({ outputDirectory }) => {
+    await writeIcons(outputDirectory, {
+      'icon16.png': setPngText(
+        fixtureIcons['icon48.png'],
+        ICON_PROVENANCE_KEY,
+        NORMAL_PROVENANCE,
+      ),
+    });
+  });
+
+  await expect(verifyIcons({ render, repositoryDirectory })).rejects.toThrow(
+    'icon16.png (dimensions 16x16 != 48x48)',
   );
 });
 
@@ -181,7 +210,7 @@ test('reports every drifted icon and the regeneration command', async () => {
   });
 
   await expect(verifyIcons({ render, repositoryDirectory })).rejects.toThrow(
-    'Icon PNG drift detected: icon16.png, icon48-dev.png. Run `npm run render:icons` and commit the regenerated files.',
+    /icon16\.png \(provenance mismatch\)[\s\S]*icon48-dev\.png \(provenance mismatch\)/u,
   );
   await expect(stat(generatedIconDirectory)).rejects.toMatchObject({
     code: 'ENOENT',
@@ -202,6 +231,42 @@ test('reports a missing committed icon as drift', async () => {
   });
 
   await expect(verifyIcons({ render, repositoryDirectory })).rejects.toThrow(
-    'Icon PNG drift detected: icon128.png.',
+    'icon128.png (committed file missing)',
+  );
+});
+
+test('reports a missing generated icon as a renderer failure', async () => {
+  const render = vi.fn(async ({ outputDirectory }) => {
+    await writeIcons(outputDirectory);
+    await rm(join(outputDirectory, 'icon128.png'));
+  });
+
+  await expect(verifyIcons({ render, repositoryDirectory })).rejects.toThrow(
+    'Generated icon missing after rendering: icon128.png.',
+  );
+});
+
+test('reports a corrupt committed PNG with its filename and origin', async () => {
+  await writeFile(
+    join(repositoryDirectory, 'public', 'logo', 'icon16.png'),
+    'not a PNG',
+  );
+  const render = vi.fn(async ({ outputDirectory }) => {
+    await writeIcons(outputDirectory);
+  });
+
+  await expect(verifyIcons({ render, repositoryDirectory })).rejects.toThrow(
+    'Cannot inspect committed icon icon16.png: Invalid PNG signature.',
+  );
+});
+
+test('reports a corrupt generated PNG with its filename and origin', async () => {
+  const render = vi.fn(async ({ outputDirectory }) => {
+    await writeIcons(outputDirectory);
+    await writeFile(join(outputDirectory, 'icon16.png'), 'not a PNG');
+  });
+
+  await expect(verifyIcons({ render, repositoryDirectory })).rejects.toThrow(
+    'Cannot inspect generated icon icon16.png: Invalid PNG signature.',
   );
 });

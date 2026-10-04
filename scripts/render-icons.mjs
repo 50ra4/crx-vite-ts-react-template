@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,10 +16,30 @@ const ICON_VARIANTS = [
 export const ICON_FILENAMES = ICON_VARIANTS.flatMap(({ suffix }) =>
   ICON_SIZES.map((size) => `icon${size}${suffix}.png`),
 );
-export const ICON_SOURCE_HASH_KEY = 'SVG-SHA256';
+export const ICON_PROVENANCE_KEY = 'Icon-Provenance-SHA256';
 const defaultRepositoryDirectory = fileURLToPath(
   new URL('../', import.meta.url),
 );
+const rendererSource = await readFile(fileURLToPath(import.meta.url), 'utf8');
+const require = createRequire(import.meta.url);
+const playwrightVersion = require('@playwright/test/package.json').version;
+
+const normalizeLineEndings = (value) => value.replaceAll(/\r\n?/gu, '\n');
+
+export const createIconProvenance = ({
+  playwrightVersion: version,
+  rendererSource: source,
+  svg,
+}) =>
+  createHash('sha256')
+    .update(
+      JSON.stringify({
+        playwrightVersion: version,
+        rendererSource: normalizeLineEndings(source),
+        svg: normalizeLineEndings(svg),
+      }),
+    )
+    .digest('hex');
 
 export const renderIcons = async ({
   browserType = chromium,
@@ -39,7 +60,11 @@ export const renderIcons = async ({
         resolve(sourceDirectory, variant.source),
         'utf8',
       );
-      const sourceHash = createHash('sha256').update(svg).digest('hex');
+      const provenance = createIconProvenance({
+        playwrightVersion,
+        rendererSource,
+        svg,
+      });
 
       for (const size of ICON_SIZES) {
         const page = await browser.newPage({
@@ -59,14 +84,12 @@ export const renderIcons = async ({
             outputDirectory,
             `icon${size}${variant.suffix}.png`,
           );
-          await icon.screenshot({
+          const png = await icon.screenshot({
             omitBackground: true,
-            path: outputPath,
           });
-          const png = await readFile(outputPath);
           await writeFile(
             outputPath,
-            setPngText(png, ICON_SOURCE_HASH_KEY, sourceHash),
+            setPngText(png, ICON_PROVENANCE_KEY, provenance),
           );
         } finally {
           await page.close();

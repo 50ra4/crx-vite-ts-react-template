@@ -1,13 +1,17 @@
 // @vitest-environment node
 
-import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getPngText } from './png-metadata.mjs';
-import { ICON_SOURCE_HASH_KEY, renderIcons } from './render-icons.mjs';
+import {
+  createIconProvenance,
+  ICON_FILENAMES,
+  ICON_PROVENANCE_KEY,
+  renderIcons,
+} from './render-icons.mjs';
 
 const NORMAL_SVG = '<svg data-variant="normal"></svg>';
 const DEVELOPMENT_SVG = '<svg data-variant="development"></svg>';
@@ -28,11 +32,11 @@ const createFakeBrowserType = ({ failingScreenshot = 0 } = {}) => {
           void callback;
           return dimension;
         }),
-        screenshot: vi.fn(async ({ path }) => {
+        screenshot: vi.fn(async () => {
           if (pageNumber === failingScreenshot) {
             throw new Error('Screenshot failed');
           }
-          await writeFile(path, pngFixture);
+          return pngFixture;
         }),
       };
       const page = {
@@ -97,35 +101,21 @@ test('renders normal and development SVGs at every extension icon size', async (
     Array(6).fill('svg'),
   );
 
-  const expectedPaths = [
-    'icon16.png',
-    'icon48.png',
-    'icon128.png',
-    'icon16-dev.png',
-    'icon48-dev.png',
-    'icon128-dev.png',
-  ].map((filename) => join(repositoryDirectory, 'public', 'logo', filename));
+  const expectedPaths = ICON_FILENAMES.map((filename) =>
+    join(repositoryDirectory, 'public', 'logo', filename),
+  );
   expect(
     pages.map(({ locator }) => locator.screenshot.mock.calls[0][0]),
-  ).toEqual(expectedPaths.map((path) => ({ omitBackground: true, path })));
-  const normalHash = createHash('sha256').update(NORMAL_SVG).digest('hex');
-  const developmentHash = createHash('sha256')
-    .update(DEVELOPMENT_SVG)
-    .digest('hex');
-  await expect(
-    Promise.all(
-      expectedPaths.map(async (path) =>
-        getPngText(await readFile(path), ICON_SOURCE_HASH_KEY),
-      ),
+  ).toEqual(Array(6).fill({ omitBackground: true }));
+  const provenances = await Promise.all(
+    expectedPaths.map(async (path) =>
+      getPngText(await readFile(path), ICON_PROVENANCE_KEY),
     ),
-  ).resolves.toEqual([
-    normalHash,
-    normalHash,
-    normalHash,
-    developmentHash,
-    developmentHash,
-    developmentHash,
-  ]);
+  );
+  expect(provenances[0]).toMatch(/^[a-f0-9]{64}$/u);
+  expect(provenances.slice(0, 3)).toEqual(Array(3).fill(provenances[0]));
+  expect(provenances[3]).not.toBe(provenances[0]);
+  expect(provenances.slice(3)).toEqual(Array(3).fill(provenances[3]));
   for (const { page } of pages) {
     expect(page.close).toHaveBeenCalledOnce();
   }
@@ -143,12 +133,40 @@ test('renders into an explicit output directory', async () => {
   });
 
   const rendered = await readFile(join(outputDirectory, 'icon16.png'));
-  expect(getPngText(rendered, ICON_SOURCE_HASH_KEY)).toBe(
-    createHash('sha256').update(NORMAL_SVG).digest('hex'),
-  );
+  expect(getPngText(rendered, ICON_PROVENANCE_KEY)).toMatch(/^[a-f0-9]{64}$/u);
   await expect(
     readFile(join(repositoryDirectory, 'public', 'logo', 'icon16.png')),
   ).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+test('normalizes line endings in provenance inputs', () => {
+  const lf = createIconProvenance({
+    playwrightVersion: '1.2.3',
+    rendererSource: 'const size = 16;\n',
+    svg: '<svg>\n</svg>\n',
+  });
+  const crlf = createIconProvenance({
+    playwrightVersion: '1.2.3',
+    rendererSource: 'const size = 16;\r\n',
+    svg: '<svg>\r\n</svg>\r\n',
+  });
+
+  expect(crlf).toBe(lf);
+});
+
+test('changes provenance with the renderer implementation or Playwright version', () => {
+  const input = {
+    playwrightVersion: '1.2.3',
+    rendererSource: 'const size = 16;',
+    svg: '<svg></svg>',
+  };
+
+  expect(
+    createIconProvenance({ ...input, rendererSource: 'const size = 48;' }),
+  ).not.toBe(createIconProvenance(input));
+  expect(
+    createIconProvenance({ ...input, playwrightVersion: '1.2.4' }),
+  ).not.toBe(createIconProvenance(input));
 });
 
 test.each([
