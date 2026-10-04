@@ -101,9 +101,10 @@ entrypoints; the manifest is generated from
 | `npm run build` | Build to `extension/` | deletes and recreates the dir |
 | `npm run package` | Build, verify manifest, create reproducible `extension.zip` | archives distributable files from `extension/` |
 | `npm run verify` | check-type → lint → test → build → verify:manifest, in series | the safety contract for most changes; excludes e2e for speed |
-| `npm run verify:full` | `verify` then `npm run e2e` | full contract; requires installed Chromium |
+| `npm run verify:full` | `verify`, `verify:icons`, then `npm run e2e` | full contract; requires installed Chromium |
 | `npm run e2e` | Run Playwright Chromium smoke tests | requires a prior build and installed Chromium |
 | `npm run render:icons` | Render 16/48/128 px normal/dev PNG icons from SVG sources | requires installed Chromium |
+| `npm run verify:icons` | Render icons to a temporary directory and compare with committed PNGs | requires installed Chromium; does not modify `public/logo/` |
 | `npm run check-type` | `tsc --noEmit` | |
 | `npm test` | Run Vitest | src tests use jsdom; script and e2e helper tests use Node |
 | `npm run lint` | `oxlint` (check-only) | no file mutation; pre-commit runs the staged-only equivalent via lint-staged |
@@ -117,12 +118,15 @@ entrypoints; the manifest is generated from
 - `npm run verify` runs check-type, lint, unit tests, build, and manifest
   verification in order. `verify:manifest` reads the built
   `extension/manifest.json`, so build always runs first.
-- `npm run verify:full` runs `verify` and the real-Chromium E2E suite.
+- `npm run verify` remains Chromium-free.
+- `npm run verify:full` runs `verify`, the real-Chromium icon drift check, and
+  the real-Chromium E2E suite.
 
 | Change | Run |
 | --- | --- |
 | `src/lib/**`, types, unit tests, `src/examples/**`, agent-document contracts | `npm run verify` |
 | `manifest.config.ts`, permissions, CSP | `npm run verify` (asserts the manifest) |
+| `assets/branding/*.svg`, `public/logo/*.png`, icon rendering | `npm run verify:full` (asserts SVG/PNG synchronization) |
 | entrypoint wiring, messaging/storage round-trips, anything E2E exercises | `npm run verify:full` |
 
 CI already runs the same underlying checks as separate jobs.
