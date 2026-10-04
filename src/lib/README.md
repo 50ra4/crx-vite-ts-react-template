@@ -28,10 +28,14 @@ window として推論する。`windowId` の指定有無が混在する場合�
 `executeScriptError` だけの指定は、エラー経路専用のfixtureモードであり、
 タブを登録せず任意の整数タブIDで設定エラーを再現できる。
 引数形式の検証は省略しない。
-`args` はシリアライズ済みデータからなる配列に限定し、関数や `undefined` などは拒否する。
-Chromeによる引数の自動変換は再現しない。`target` は `tabId` と既定動作に等しい
+`args` は配列のトップレベル要素を検証し、関数・`undefined`・非有限数などを拒否する。
+入れ子の値は受理するが、fakeは注入関数を実行せず引数の変換も行わない。
+実Chromiumの変換結果は共通の `injectionArgumentCases` で検証する。
+`target` は `tabId` と既定動作に等しい
 `allFrames: false` に対応し、`frameIds` / `allFrames: true` / `documentIds` は未対応として拒否する。
 `func` / `files` が指定されている場合は、排他・内容の検証前に型を検証する。
+これらと `args`、任意のtarget項目の `null` / `undefined` は省略扱いにする。
+必須の `target.tabId` は引き続き整数でなければならない。
 設定エラーの参照は生成時に固定し、後からoptionsのプロパティを削除・差し替えても
 動作を変えない。Errorオブジェクト自体のcloneは行わない。
 `executeScriptResult` だけの指定は許可せず、`activeTab` または `tabs` に
@@ -47,6 +51,7 @@ Chromeによる引数の自動変換は再現しない。`target` は `tabId` �
 
 `executeScriptResult` は **Chromeによる変換後のAPI応答** を指定するfixtureであり、
 注入関数の生の戻り値ではない。`func` の実行やChromeの直列化処理は再現しない。
+各応答のキーは `frameId` / `documentId` / `result` に限定し、未知キーは生成時に拒否する。
 各応答の `frameId` は0以上の整数。実Chromeが返す `documentId` はfakeでは省略可能で、
 指定する場合は文字列とする。fakeによるdocument IDの自動生成は行わない。
 結果には `null`・文字列・有限数・真偽値・密な配列・plain object
