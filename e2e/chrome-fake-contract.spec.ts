@@ -1,5 +1,7 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import {
+  injectionArgumentCases,
+  executeArgumentContractCase,
   acceptedTabUrlPatterns,
   invalidTabUrlPatterns,
   queryFixtureUrls,
@@ -201,6 +203,47 @@ test('documents the serialized values expected by injection result fixtures', as
   expect(rejections[1]).toContain('unserializable');
   expect(rejections[2]).toContain("Cannot specify 'allFrames'");
   expect(rejections[3]).toContain('No frame with id 5');
+  for (const contract of injectionArgumentCases) {
+    const result = extensionPage.evaluate(executeArgumentContractCase, {
+      name: contract.name,
+      tabId,
+    });
+    if (contract.accepted)
+      await expect(result).resolves.toEqual(contract.expected);
+    else await expect(result).rejects.toThrow('unserializable');
+  }
+  await extensionPage.evaluate(async (tabId) => {
+    for (const value of [null, undefined]) {
+      for (const key of ['frameIds', 'documentIds', 'allFrames']) {
+        // oxlint-disable-next-line no-restricted-globals -- Verify nullish options through Chromium's binding.
+        const call = chrome.scripting.executeScript;
+        const [result] = await Reflect.apply(call, undefined, [
+          {
+            target: { tabId, [key]: value },
+            func: () => 7,
+            files: value,
+            args: value,
+          },
+        ]);
+        if (result.result !== 7)
+          throw new Error('Unexpected nullish option result');
+      }
+      try {
+        // oxlint-disable-next-line no-restricted-globals -- A missing file distinguishes accepted bindings from type errors.
+        await Reflect.apply(chrome.scripting.executeScript, undefined, [
+          {
+            target: { tabId },
+            files: ['missing-contract.js'],
+            func: value,
+            args: value,
+          },
+        ]);
+        throw new Error('Missing script unexpectedly loaded');
+      } catch (error) {
+        if (!String(error).includes('Could not load file')) throw error;
+      }
+    }
+  }, tabId);
   await expect(
     extensionPage.evaluate(async (tabId) => {
       // oxlint-disable-next-line no-restricted-globals -- Probe invalid source types through the real API.

@@ -290,3 +290,37 @@ export const invalidTabUrlPatterns = [
   'chrome://version:80/*',
   'unknown-test-scheme://*/*',
 ];
+export const injectionArgumentCases = [
+  { name: 'function', accepted: false },
+  { name: 'undefined', accepted: false },
+  { name: 'nan', accepted: false },
+  { name: 'nested-undefined', accepted: true, expected: { selector: 'x' } },
+  { name: 'nested-function', accepted: true, expected: {} },
+  { name: 'nested-nan', accepted: true, expected: {} },
+  { name: 'nested-array', accepted: true, expected: [1, null] },
+] as const;
+
+// Self-contained so Playwright can run the exact same inputs in the extension.
+export const executeArgumentContractCase = async ({
+  name,
+  tabId,
+}: {
+  name: string;
+  tabId: number;
+}): Promise<unknown> => {
+  const values: Record<string, unknown> = {
+    function: () => 1,
+    undefined: undefined,
+    nan: NaN,
+    'nested-undefined': { selector: 'x', opts: undefined },
+    'nested-function': { f: () => 1 },
+    'nested-nan': { n: NaN },
+    'nested-array': [1, undefined],
+  };
+  const [response] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (value: unknown) => value,
+    args: [values[name]],
+  });
+  return response.result;
+};

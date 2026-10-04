@@ -159,6 +159,14 @@ const cloneInjectionFixture = (
         'executeScriptResult frameId must be a non-negative integer.',
       );
     }
+    const unknownKey = Reflect.ownKeys(entry).find(
+      (key) => key !== 'frameId' && key !== 'documentId' && key !== 'result',
+    );
+    if (unknownKey !== undefined) {
+      throw new TypeError(
+        `Unsupported executeScriptResult field: ${String(unknownKey)}.`,
+      );
+    }
     if (
       entry.documentId !== undefined &&
       typeof entry.documentId !== 'string'
@@ -451,17 +459,17 @@ const getTargetTabId = (injection: Record<string, unknown>): number => {
     typeof target.tabId === 'number' &&
     Number.isInteger(target.tabId)
   ) {
-    const unsupported = Object.keys(target).find(
-      (key) =>
+    const unsupported = Object.entries(target).find(
+      ([key, value]) =>
+        value !== undefined &&
+        value !== null &&
         key !== 'tabId' &&
-        !(
-          key === 'allFrames' &&
-          'allFrames' in target &&
-          target.allFrames === false
-        ),
+        !(key === 'allFrames' && value === false),
     );
     if (unsupported) {
-      throw new TypeError(`Unsupported executeScript target: ${unsupported}.`);
+      throw new TypeError(
+        `Unsupported executeScript target: ${unsupported[0]}.`,
+      );
     }
     return target.tabId;
   }
@@ -472,10 +480,18 @@ const getTargetTabId = (injection: Record<string, unknown>): number => {
 };
 
 const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
-  if (injection.func !== undefined && typeof injection.func !== 'function') {
+  if (
+    injection.func !== undefined &&
+    injection.func !== null &&
+    typeof injection.func !== 'function'
+  ) {
     throw new TypeError('executeScript func must be a function.');
   }
-  if (injection.files !== undefined && !Array.isArray(injection.files)) {
+  if (
+    injection.files !== undefined &&
+    injection.files !== null &&
+    !Array.isArray(injection.files)
+  ) {
     throw new TypeError('executeScript files must be an array.');
   }
   const hasFunc = typeof injection.func === 'function';
@@ -496,12 +512,21 @@ const assertSingleScriptSource = (injection: Record<string, unknown>): void => {
     );
   }
 
-  if (injection.args !== undefined && !hasFunc) {
+  if (injection.args !== undefined && injection.args !== null && !hasFunc) {
     throw new TypeError("Cannot specify 'args' without 'func'.");
   }
   if (
     injection.args !== undefined &&
-    (!Array.isArray(injection.args) || !isSerializableResult(injection.args))
+    injection.args !== null &&
+    (!Array.isArray(injection.args) ||
+      !Array.from(injection.args).every(
+        (value: unknown) =>
+          value === null ||
+          typeof value === 'object' ||
+          typeof value === 'string' ||
+          typeof value === 'boolean' ||
+          (typeof value === 'number' && Number.isFinite(value)),
+      ))
   ) {
     throw new TypeError('executeScript args must contain serializable data.');
   }
@@ -863,7 +888,7 @@ export const createChromeFake = (
       executeScript: vi.fn(async (injection: Record<string, unknown>) => {
         assertSingleScriptSource(injection);
         const tabId = getTargetTabId(injection);
-        // The owner-approved error-only fixture bypasses tab existence checks.
+        // Error-only fixtures reproduce injection failure for any integer tab ID without registering a tab.
         const requiresTab = hasTabFixture || !executeScriptError;
         if (requiresTab && !tabs.some((tab) => tab.id === tabId)) {
           throw new Error(`No tab with id: ${tabId}.`);

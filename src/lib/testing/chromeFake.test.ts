@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createChromeFake, installChromeFake } from './chromeFake';
 import {
+  injectionArgumentCases,
+  executeArgumentContractCase,
   acceptedTabUrlPatterns,
   invalidTabUrlPatterns,
   queryFixtureUrls,
@@ -53,6 +55,63 @@ const executeInActiveTab = async (): Promise<SampleInjectionResult | null> => {
 };
 
 describe('Chrome fake', () => {
+  it.each(injectionArgumentCases)(
+    'matches argument contract: $name',
+    async ({ name, accepted }) => {
+      installChromeFake({ activeTab: { id: 42 } });
+      const result = executeArgumentContractCase({ name, tabId: 42 });
+      if (accepted) await expect(result).resolves.toBeNull();
+      else
+        await expect(result).rejects.toThrow(
+          'args must contain serializable data',
+        );
+    },
+  );
+
+  it.each([null, undefined])(
+    'treats nullish injection options as omitted: %s',
+    async (value) => {
+      const fake = createChromeFake({ activeTab: { id: 42 } });
+      for (const key of ['frameIds', 'documentIds', 'allFrames']) {
+        await expect(
+          fake.chrome.scripting.executeScript({
+            target: { tabId: 42, [key]: value },
+            func: () => undefined,
+            files: value,
+            args: value,
+          }),
+        ).resolves.toEqual([{ frameId: 0, result: null }]);
+      }
+      await expect(
+        fake.chrome.scripting.executeScript({
+          target: { tabId: 42 },
+          files: ['a.js'],
+          func: value,
+          args: value,
+        }),
+      ).resolves.toEqual([{ frameId: 0, result: null }]);
+      await expect(
+        fake.chrome.scripting.executeScript({
+          target: { tabId: 42 },
+          files: value,
+          func: value,
+        }),
+      ).rejects.toThrow('Exactly one');
+    },
+  );
+
+  it.each(['error', 'extra'])(
+    'rejects unknown injection result key %s',
+    (key) => {
+      const entry = { frameId: 0, result: 1, [key]: 'x' };
+      expect(() =>
+        createChromeFake({
+          activeTab: { id: 42 },
+          executeScriptResult: [entry],
+        }),
+      ).toThrow('Unsupported executeScriptResult field');
+    },
+  );
   it('accepts explicit allFrames false without allowing frame selectors', async () => {
     const fake = createChromeFake({ activeTab: { id: 42 } });
     await expect(
@@ -71,7 +130,7 @@ describe('Chrome fake', () => {
     }
   });
 
-  it.each(['x', null, 1, {}])(
+  it.each(['x', 1, {}])(
     'rejects explicitly invalid source types %j',
     async (value) => {
       const fake = createChromeFake({ activeTab: { id: 42 } });
@@ -92,7 +151,7 @@ describe('Chrome fake', () => {
     },
   );
 
-  it.each([[undefined], [() => 1], [{ nested: undefined }]])(
+  it.each([[undefined], [() => 1], [NaN]])(
     'rejects unserializable injection args %j before configured errors',
     async (value) => {
       for (const options of [
