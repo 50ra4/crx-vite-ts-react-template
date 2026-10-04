@@ -121,6 +121,24 @@ test('renders normal and development SVGs at every extension icon size', async (
   expect(browser.close).toHaveBeenCalledOnce();
 });
 
+test('renders into an explicit output directory', async () => {
+  const { browserType } = createFakeBrowserType();
+  const outputDirectory = join(repositoryDirectory, 'generated-icons');
+
+  await renderIcons({
+    browserType,
+    outputDirectory,
+    repositoryDirectory,
+  });
+
+  await expect(
+    readFile(join(outputDirectory, 'icon16.png'), 'utf8'),
+  ).resolves.toBe('icon-1');
+  await expect(
+    readFile(join(repositoryDirectory, 'public', 'logo', 'icon16.png')),
+  ).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
 test.each([
   ['icon16.png', 16],
   ['icon48.png', 48],

@@ -9,6 +9,9 @@ const ICON_VARIANTS = [
   { source: 'icon.svg', suffix: '' },
   { source: 'icon-dev.svg', suffix: '-dev' },
 ];
+export const ICON_FILENAMES = ICON_VARIANTS.flatMap(({ suffix }) =>
+  ICON_SIZES.map((size) => `icon${size}${suffix}.png`),
+);
 const defaultRepositoryDirectory = fileURLToPath(
   new URL('../', import.meta.url),
 );
@@ -16,9 +19,9 @@ const defaultRepositoryDirectory = fileURLToPath(
 export const renderIcons = async ({
   browserType = chromium,
   repositoryDirectory = defaultRepositoryDirectory,
+  outputDirectory = resolve(repositoryDirectory, 'public', 'logo'),
 } = {}) => {
   const sourceDirectory = resolve(repositoryDirectory, 'assets', 'branding');
-  const outputDirectory = resolve(repositoryDirectory, 'public', 'logo');
   await mkdir(outputDirectory, { recursive: true });
 
   const browser = await browserType.launch({
