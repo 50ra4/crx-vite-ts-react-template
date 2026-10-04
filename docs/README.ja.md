@@ -118,17 +118,24 @@ DevTools パネルのサーフェスは意図的に含めていません。必�
 | `npm test`                | Vitest ユニットテスト(jsdom。watch は `npm run test -- --watch`)       |
 | `npm run e2e`             | 実 Chromium でビルド済み拡張を検証する Playwright スモークテスト         |
 | `npm run render:icons`    | `assets/branding/*.svg` から通常版・開発版 PNG アイコンを再生成          |
+| `npm run verify:icons`    | コミット済み PNG と SVG・レンダラの不一致を検出                         |
 | `npm run lint`            | Oxlint(検査のみ。`chrome.*` 境界ルールを含む)                          |
 | `npm run format`          | Prettier(ファイルを書き換え)                                           |
 | `npm run check-type`      | `tsc --noEmit`                                                           |
 | `npm run verify:manifest` | ビルド成果物 `extension/manifest.json` を固定の許可リストと照合          |
 | `npm run verify`          | check-type → lint → test → build → verify:manifest を直列実行            |
-| `npm run verify:full`     | `verify` + `e2e` — フルの検証契約                                        |
+| `npm run verify:full`     | `verify` + アイコンdrift検証 + `e2e` — フルの検証契約                    |
 
 補足:
 
-- E2E とアイコン生成は初回のみ Chromium のインストールが必要です:
+- E2E、アイコン生成、アイコンdrift検証は初回のみ Chromium のインストールが必要です:
   `npx playwright install chromium`
+- `npm run verify` は Chromium 不要のままです。`verify:full` は
+  `verify:icons` と E2E を追加実行します。アイコン検証は一時ディレクトリへ
+  生成するため、`public/logo/` のコミット済みファイルを変更しません。
+- `render:icons` は、改行を正規化した SVG、レンダラ実装、Playwright 版の
+  SHA-256 provenance を各 PNG に記録します。`verify:icons` は provenance と
+  寸法の完全一致に加え、OSごとの Chromium 描画差を許容したRGBA画素比較を行います。
 - E2E は dev サーバではなく**ビルド成果物**を読み込むため、先にビルドします:
   `npm run build && npm run e2e`
 - コード変更後は `npm run verify` の1コマンドで安全性を証明できます。
@@ -137,7 +144,7 @@ DevTools パネルのサーフェスは意図的に含めていません。必�
 
 CI([`.github/workflows/ci.yml`](../.github/workflows/ci.yml))は `main` への
 push とすべての pull request で同じチェック(type check、lint、unit test、
-build + manifest 検証、実 Chromium E2E)を実行します。
+build + manifest 検証、アイコンdrift検証、実 Chromium E2E)を実行します。
 
 ## Architecture
 
@@ -190,6 +197,7 @@ src/
    更新します。`assets/branding/` の通常版・開発版 SVG を差し替えてから
    `npm run render:icons` を実行し、`public/logo/` の 16/48/128 px PNG を
    再生成します。開発版のファイル名は `-dev` suffix を維持します。
+   PNGがSVG・レンダラと一致するまで `npm run verify:icons` は失敗します。
    `displayName` がテンプレートの既定値のままなら
    `npm run verify:manifest` が警告します。
 4. `manifest.config.ts` の content script `matches`(`https://example.com/*`)を

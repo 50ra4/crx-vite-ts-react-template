@@ -123,7 +123,7 @@ and `.claude/skills/add-entrypoint/SKILL.md`.
 | `npm test`                | Vitest unit tests (jsdom; `npm run test -- --watch` for watch mode)       |
 | `npm run e2e`             | Playwright smoke tests against the built extension in a real Chromium     |
 | `npm run render:icons`    | Regenerates normal/dev PNG icons from `assets/branding/*.svg`             |
-| `npm run verify:icons`    | Fails when committed PNG icons differ from their SVG sources              |
+| `npm run verify:icons`    | Fails when committed PNG icons differ from their SVG or renderer           |
 | `npm run lint`            | Oxlint, check-only (includes the `chrome.*` boundary rule)                |
 | `npm run format`          | Prettier, rewrites files                                                  |
 | `npm run check-type`      | `tsc --noEmit`                                                            |
@@ -138,8 +138,10 @@ Notes:
 - `npm run verify` remains Chromium-free. `npm run verify:full` adds
   `verify:icons` and E2E; icon verification renders into a temporary directory
   and never rewrites committed files under `public/logo/`.
-- `render:icons` records each source SVG's SHA-256 in the generated PNG metadata.
-  `verify:icons` compares this provenance instead of OS-dependent raster bytes.
+- `render:icons` records a SHA-256 provenance of the normalized SVG, renderer
+  implementation, and Playwright version in each PNG. `verify:icons` requires
+  exact provenance and dimensions, then compares RGBA pixels with a small
+  tolerance for OS-specific Chromium rasterization differences.
 - E2E loads the **build output**, not the dev server, so build first:
   `npm run build && npm run e2e`.
 - After changing code, `npm run verify` is the single command that proves the
